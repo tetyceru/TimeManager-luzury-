@@ -1,0 +1,2912 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TimeManager">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+
+    <link rel="manifest"
+        href="data:application/manifest+json,{%22name%22:%22TimeManager%20Pro%22,%22short_name%22:%22TimeManager%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23f4f5f7%22,%22theme_color%22:%22%235c67f2%22}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Time Manager Pro</title>
+    <style>
+        :root {
+            --primary: #5c67f2;
+            --shift: #4caf50;
+            --job: #ffa500;
+            --danger: #ff4d4d;
+            --bg: #f4f5f7;
+            --holiday: #ff5252;
+            --sleep: #d8d6f0;
+        }
+
+        body {
+            font-family: sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+            /* containより強力にブラウザのバウンスを抑制 */
+            user-select: none;
+            /* 文字選択が走ってドラッグが途切れるのを防ぐ */
+            -webkit-user-select: none;
+        }
+
+        /* スライダーの見た目をカスタマイズ（エラー対策版） */
+        input[type="range"] {
+            -webkit-appearance: none;
+            /* 古いブラウザ用 */
+            appearance: none;
+            /* 標準プロパティ（これでエラーが消えます） */
+            background: #eee;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        /* つまみ（丸い部分） */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            /* 標準プロパティ */
+            width: 24px;
+            height: 24px;
+            background: #4caf50;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 550px;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 15px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .month-nav {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .title-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #view-title {
+            cursor: pointer;
+            font-size: 17px;
+            margin: 0;
+            padding: 5px 8px;
+            border-radius: 6px;
+            background: #f0f0f0;
+        }
+
+        .nav-btn {
+            background: #eee;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .reset-btn {
+            background: #fff1f1;
+            color: var(--danger);
+            border: 1px solid #ffcccc;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-top: 4px;
+            touch-action: manipulation;
+        }
+
+        .mode-switch {
+            background: #f0f0f0;
+            padding: 3px;
+            /* 4pxから3pxへ（少しスリムに） */
+            border-radius: 20px;
+            display: flex;
+            width: 80%;
+            /* 100%から80%に（左右に余裕を持たせる） */
+            margin: 0 auto 15px;
+            /* autoで中央寄せ、下に15pxの余白 */
+            box-sizing: border-box;
+        }
+
+        .mode-btn {
+            flex: 1;
+            border: none;
+            padding: 6px 0;
+            /* 10pxから6pxへ（高さを抑える） */
+            border-radius: 18px;
+            cursor: pointer;
+            font-size: 12px;
+            /* 13pxから12pxへ（少し小さく） */
+            font-weight: bold;
+            transition: all 0.2s;
+            background: transparent;
+            color: #666;
+        }
+
+        /* アクティブ時のスタイルはそのまま */
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .mode-btn.shift-active {
+            background: var(--shift) !important;
+            color: white;
+        }
+
+        /* Calendar */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .calendar-day {
+            border: 1px solid #eee;
+            min-height: 95px;
+            padding: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            border-radius: 6px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .calendar-day.shift-mode-active {
+            border: 1.5px dashed var(--shift);
+            background-color: #fafffa;
+        }
+
+        .is-today {
+            border: 2px solid var(--primary) !important;
+            background: #f0f2ff;
+        }
+
+        .is-holiday .day-num {
+            color: var(--holiday);
+        }
+
+        .day-num {
+            font-weight: bold;
+        }
+
+        .holiday-name {
+            font-size: 8px;
+            color: var(--holiday);
+            overflow: hidden;
+            white-space: nowrap;
+            margin-bottom: 2px;
+        }
+
+        .job-band {
+            height: 15px;
+            background: var(--job);
+            color: white;
+            font-size: 9px;
+            margin-bottom: 2px;
+            border-radius: 3px;
+            padding: 0 4px;
+            line-height: 15px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .job-band.deleted {
+            background: repeating-linear-gradient(45deg, #ff4d4d, #ff4d4d 5px, #ff6666 5px, #ff6666 10px);
+        }
+
+        .shift-band {
+            background: #e8f5e9 !important;
+            color: #2e7d32 !important;
+            border: 1px solid var(--shift);
+            font-weight: bold;
+        }
+
+        /* タイムラインを囲む親玉（スクロールする枠） */
+        #timeline-container {
+            position: relative;
+            /* margin-left を 0 にして、padding でスペースを作るのがコツです */
+            margin-left: 10px;
+            margin-right: 10px;
+            height: 70vh;
+            overflow-y: auto;
+            /* ★ここに広めのスペース(60px)を確保して、タイムラインを右に追い出す */
+            padding-left: 60px !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 2. タイムライン（白いエリア）自体の設定 */
+        #timeline {
+            width: 100%;
+            /* これで確保した padding 以外の場所に収まります */
+            height: 1920px !important;
+            border: 1px solid #ccc;
+            position: relative;
+            background: #fff;
+            box-sizing: border-box;
+            touch-action: none !important;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .time-slot {
+            height: 20px;
+            box-sizing: border-box;
+            border-bottom: 1px solid #eee;
+            position: relative;
+        }
+
+        /* 時刻ラベルの基本スタイル */
+        .time-label {
+            position: absolute;
+            /* ★containerの左端から 5px の位置に置く。これで重なりません */
+            left: 5px !important;
+            width: 45px;
+            text-align: right;
+            font-size: 11px;
+            color: #888;
+            font-weight: bold;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .fixed-busy {
+            background-color: var(--sleep);
+        }
+
+        .shift-busy {
+            background-color: #e8f5e9;
+            border-left: 5px solid var(--shift);
+        }
+
+        /* 予定ブロックとボタンの設定 */
+        .custom-task {
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: grab;
+            box-sizing: border-box;
+            overflow: visible;
+            touch-action: none !important;
+            transition: box-shadow 0.2s;
+        }
+
+        /* 掴んでいる間のカーソルを「握った手」にする */
+        .custom-task:active {
+            cursor: grabbing;
+        }
+
+
+        .custom-task:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-group-mini {
+            display: flex;
+            gap: 2px;
+            z-index: 20;
+        }
+
+        .del-btn-mini {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 24px;
+            height: 18px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .del-btn-mini {
+            position: relative;
+            /* z-indexを有効にするため */
+            z-index: 1000 !important;
+            /* ブロック(10)より確実に上に */
+            cursor: pointer;
+            pointer-events: auto !important;
+            /* 確実に反応させる */
+            touch-action: manipulation;
+            /* ズームなどの余計な挙動を抑止 */
+        }
+
+        .move-preview {
+            opacity: 0.6;
+            pointer-events: none;
+            z-index: 50;
+            position: absolute;
+            left: 0;
+            right: 0;
+            border: 1px solid white;
+        }
+
+        .drag-guide {
+            position: absolute;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background: rgba(92, 103, 242, 0.3);
+            border: 2px dashed var(--primary);
+            z-index: 1000;
+            pointer-events: none;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .time-slot::after {
+            content: attr(data-label);
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 10px;
+            color: rgba(0, 0, 0, 0.1);
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        .commute-busy,
+        .break-busy {
+            background-color: #f0f0f0 !important;
+        }
+
+        /* Job Cards & Modals */
+        .job-card {
+            background: #fffaf0;
+            border: 1px solid #ffe0b2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .job-card.completed {
+            background-color: #f8f9fa !important;
+            border-color: #eee !important;
+            opacity: 0.7;
+            /* 少し薄くする */
+            transition: all 0.5s ease;
+            /* 移動するときにふわっと動く */
+        }
+
+        .job-card.completed b {
+            text-decoration: line-through;
+            /* 文字に打ち消し線 */
+            color: #b8860b !important;
+            /* ダークゴールデンロッド */
+        }
+
+        .job-card.deleted {
+            background: repeating-linear-gradient(45deg, #fff5f5, #fff5f5 10px, #ffebeb 10px, #ffebeb 20px);
+            border-color: var(--danger);
+        }
+
+        .job-card-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .progress-input {
+            width: 60px !important;
+            margin: 0 !important;
+            padding: 4px !important;
+            text-align: center;
+        }
+
+        .mini-btn {
+            padding: 6px 10px;
+            font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+        }
+
+        .progress-gold {
+            background: linear-gradient(270deg, #ffd700, #ffecb3, #d4af37, #fdf5e6);
+            background-size: 400% 400%;
+            animation: goldShine 3s ease infinite;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+        }
+
+        @keyframes goldShine {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        .modal-overlay {
+            position: fixed;
+            /* 画面の決まった位置に固定 */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            /* 背景を暗くする */
+            display: none;
+            /* ★ ここ！最初は非表示にする */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            /* カレンダーより手前に表示 */
+        }
+
+        .modal {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 360px;
+            position: relative;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .save-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+
+        .side-nav {
+            display: none;
+            /* ★これを追加：初期状態は隠す */
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.4);
+            color: white;
+            padding: 15px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 5000;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .prev-day {
+            left: 0;
+            border-radius: 0 10px 10px 0;
+            /* 右側だけ丸く */
+        }
+
+        .next-day {
+            right: 0;
+            border-radius: 10px 0 0 10px;
+            /* 左側だけ丸く */
+        }
+
+        .nav-arrow {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .nav-text {
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        .side-nav:active {
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+
+        /* 曜日のヘッダー部分 */
+        .calendar-weekday-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            /* 7列に分ける */
+            gap: 4px;
+            margin-bottom: 4px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* 土日の色を変えるとおしゃれです（任意） */
+        .calendar-weekday-header div:nth-child(1) {
+            color: var(--holiday);
+        }
+
+        /* 日曜日 */
+        .calendar-weekday-header div:nth-child(7) {
+            color: #5c67f2;
+        }
+
+        /* 土曜日 */
+
+        /* 他の月の日付を薄くする */
+        .other-month {
+            background: #fafafa !important;
+            /* 背景を少しグレーに */
+            color: #ccc !important;
+            /* 文字を薄く */
+            cursor: default !important;
+            /* クリックできない感を出すす */
+            pointer-events: none;
+            /* 実際にクリックを無効化 */
+        }
+
+        /* カレンダーの1列目（日曜日）の数字を赤く */
+        .calendar-grid div:nth-child(7n+1) .day-num {
+            color: var(--holiday);
+        }
+
+        /* カレンダーの7列目（土曜日）の数字を青く */
+        .calendar-grid div:nth-child(7n) .day-num {
+            color: #5c67f2;
+        }
+
+        /* 他の月の日付は、土日でも薄い色のままにする */
+        .other-month .day-num {
+            color: #ccc !important;
+        }
+
+        /* 予定ブロック内のレイアウト */
+        .custom-task {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .custom-task {
+            touch-action: none;
+            /* ブロック上でも上下スクロールを許可 */
+        }
+
+        /* 予定ブロック自体の重なり順を調整 */
+        .task-block {
+            touch-action: none;
+            /* ブラウザのスクロールと競合しないようにする */
+        }
+
+
+        /* スタイルの最初の方に書く */
+        #scroll-remote-control {
+            display: none;
+        }
+
+        /* スマホ（画面幅 768px 以下）の時の設定 */
+        @media (max-width: 768px) {
+
+            /* 画面右端のスクロール用ハンドル（リモコン） */
+            #scroll-remote-control {
+                position: fixed;
+                right: 5px;
+                top: auto;
+                width: 35px;
+                height: 150px;
+                background: rgba(0, 0, 0, 0.4);
+                color: white;
+                z-index: 9999;
+                bottom: 100px;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                touch-action: none;
+                box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+                pointer-events: auto;
+            }
+
+            .remote-icon {
+                font-size: 24px;
+                margin: 5px 0;
+                ;
+            }
+
+            .remote-label {
+                font-size: 11px;
+                writing-mode: vertical-rl;
+                letter-spacing: 2px;
+                opacity: 0.8;
+            }
+
+            /* 予定ブロック内の三本線は不要なので非表示にするか、デザインをシンプルに */
+            .drag-handle {
+                display: none !important;
+                /* ブロック内の三本線は消す */
+            }
+
+
+        }
+
+        .remote-icon {
+            font-size: 20px;
+            margin: 10px 0;
+            opacity: 0.8;
+        }
+
+        .remote-text {
+            writing-mode: vertical-rl;
+            font-size: 11px;
+            letter-spacing: 3px;
+            opacity: 0.7;
+        }
+
+        .move-preview.collision {
+            background-color: rgba(255, 77, 77, 0.6) !important;
+            /* 透明感のある赤 */
+            border: 2px solid #ff0000 !important;
+        }
+
+        /* ついでに新規作成ガイド（長押し時）用も */
+        .drag-guide.collision {
+            background: rgba(255, 77, 77, 0.3) !important;
+            border: 2px dashed #ff0000 !important;
+            color: #ff0000 !important;
+        }
+
+        .custom-task::before,
+        .custom-task::after {
+            content: "";
+            position: absolute;
+            left: 20%;
+            right: 20%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 2px;
+        }
+
+        .custom-task::before {
+            top: 4px;
+        }
+
+        /* 上のハンドル */
+        .custom-task::after {
+            bottom: 4px;
+        }
+
+        /* 下のハンドル */
+
+        .custom-task::before,
+        .custom-task::after {
+            content: "";
+            position: absolute;
+            left: 30%;
+            right: 30%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 2px;
+        }
+
+        .custom-task::before {
+            top: 4px;
+        }
+
+        .custom-task::after {
+            bottom: 4px;
+        }
+
+        .custom-task {
+            /* ブラウザ独自のスクロールやズームを無効化して、JSのドラッグを優先させる */
+            touch-action: none;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+
+<body>
+
+    </div>
+    <div id="app-notification"
+        style="display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); width:90%; max-width:400px; background:#333; color:#fff; padding:15px; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3); z-index:10000; cursor:pointer;">
+        <div id="notification-title" style="font-weight:bold; font-size:16px; margin-bottom:5px;"></div>
+        <div id="notification-body" style="font-size:14px; white-space:pre-wrap;"></div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="top-bar">
+                <button id="back-to-cal-btn" class="nav-btn hidden" onclick="showCalendar()">← 戻る</button>
+                <div class="month-nav">
+                    <button class="nav-btn" onclick="changeMonth(-1)">く</button>
+                    <div class="title-group">
+                        <h2 id="view-title" onclick="openJumpModal()"></h2>
+                        <button class="reset-btn" id="month-reset-btn">月間リセット</button>
+                    </div>
+                    <button class="nav-btn" onclick="changeMonth(1)">＞</button>
+                </div>
+                <div id="action-btns">
+                    <button onclick="openSleepModal()" class="nav-btn" style="background:var(--sleep);">睡眠</button>
+                    <button onclick="openShiftModal()" class="nav-btn"
+                        style="background:#e8f5e9; color:#2e7d32;">シフト</button>
+                    <button onclick="openJobMenuModal()" class="nav-btn"
+                        style="background:#fff3e0; color:#e65100;">案件メニュー</button>
+                </div>
+            </div>
+            <div class="mode-switch" id="mode-selector">
+                <button class="mode-btn active" id="mode-normal-btn" onclick="setAppMode('normal')">閲覧</button>
+                <button class="mode-btn" id="mode-shift-btn" onclick="setAppMode('shift')">シフト一括</button>
+            </div>
+        </div>
+
+        <div id="calendar-screen">
+            <div class="calendar-weekday-header">
+                <div>日</div>
+                <div>月</div>
+                <div>火</div>
+                <div>水</div>
+                <div>木</div>
+                <div>金</div>
+                <div>土</div>
+            </div>
+
+            <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+        <div id="day-screen" class="hidden">
+            <div
+                style="display:flex; justify-content:center; align-items:center; background:#f0f2ff; padding:10px; border-radius:8px; margin-bottom:10px;">
+                <div style="text-align:center;">
+                    <h2 id="current-day-label" style="margin:0; font-size:16px;"></h2>
+                    <div id="freeTime" style="font-size:11px; font-weight:bold;"></div>
+                </div>
+            </div>
+
+            <div class="side-nav prev-day" id="side-prev" onclick="slideDay(-1)">
+                <span class="nav-arrow">＜</span><span class="nav-text">前日</span>
+            </div>
+            <div class="side-nav next-day" id="side-next" onclick="slideDay(1)">
+                <span class="nav-arrow">＞</span><span class="nav-text">翌日</span>
+            </div>
+
+            <div id="day-jobs-area"></div>
+            <div id="timeline-container">
+                <div id="timeline"></div>
+                <div id="drag-guide" class="drag-guide hidden"
+                    style="position:absolute; left:0; right:0; background:rgba(92,103,242,0.3); border:2px dashed var(--primary); z-index:1000; pointer-events:none;">
+                </div>
+            </div>
+        </div>
+
+        <div id="reset-modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>月間リセット</h3>
+                <p id="reset-confirm-msg" style="font-size:14px; color:#666;"></p>
+                <button onclick="executeMonthlyReset()" class="save-btn"
+                    style="background:var(--danger);">本当にすべて消去する</button>
+                <button type="button" onclick="closeModal('reset-modal-overlay')" class="save-btn"
+                    style="background:#666;">キャンセル</button>
+            </div>
+        </div>
+
+        <div id="jump-modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>年月ジャンプ</h3>
+                <div style="display:flex; gap:10px;"><select id="jump-year"></select><select id="jump-month"></select>
+                </div><button onclick="jumpToMonth()" class="save-btn">ジャンプ</button><button
+                    onclick="closeModal('jump-modal-overlay')"
+                    style="width:100%; border:none; background:none; margin-top:10px;">閉じる</button>
+            </div>
+        </div>
+
+        <div id="sleep-modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>睡眠設定</h3>
+                <div style="display:flex; gap:10px;">
+                    <div><label>開始</label><input type="time" id="sleep-start"></div>
+                    <div><label>終了</label><input type="time" id="sleep-end"></div>
+                </div>
+                <div id="batch-sleep-area"><button onclick="saveDefSleep()" class="save-btn">基本設定として保存</button></div>
+                <button id="save-day-sleep-btn" onclick="saveDaySleep()" class="save-btn hidden">この日のみ保存</button>
+                <button onclick="closeModal('sleep-modal-overlay')"
+                    style="width:100%; border:none; background:none; margin-top:10px;">キャンセル</button>
+            </div>
+        </div>
+
+        <div id="job-menu-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>案件メニュー</h3>
+                <button onclick="closeModal('job-menu-overlay'); openJobModal();" class="save-btn"
+                    style="background:#fff3e0; color:#e65100;">＋ 新規案件登録</button>
+                <button onclick="closeModal('job-menu-overlay'); openJobList();" class="save-btn"
+                    style="background:#eee; color:#333;">📋 案件一覧（全履歴）</button>
+                <button onclick="closeModal('job-menu-overlay')"
+                    style="width:100%; border:none; background:none; margin-top:15px;">閉じる</button>
+            </div>
+        </div>
+
+
+        <div id="job-modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>案件登録</h3>
+                <input type="hidden" id="edit-job-id">
+                <input type="text" id="job-name" placeholder="案件名" autocomplete="off">
+                <div style="display:flex; gap:5px;">
+                    <input type="date" id="job-start">
+                    <input type="date" id="job-end">
+                </div>
+                <input type="number" id="job-total-h" placeholder="想定合計時間(h)">
+                <textarea id="job-memo" placeholder="メモ・備考（自由入力）"
+                    style="width:100%; height:80px; margin-top:8px; padding:10px; border-radius:6px; border:1px solid #ddd; font-size:14px; box-sizing:border-box;"></textarea>
+
+                <div
+                    style="margin-top:15px; background:#f9f9f9; padding:12px; border-radius:8px; border:1px solid #eee;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:13px; font-weight:bold; color:#666;">進捗率</span>
+                        <span id="job-progress-display"
+                            style="font-size:16px; font-weight:bold; color:#4caf50;">0%</span>
+                    </div>
+                    <input type="range" id="job-progress" min="0" max="100" value="0"
+                        style="width:100%; height:8px; cursor:pointer; accent-color:#4caf50;"
+                        oninput="document.getElementById('job-progress-display').textContent = this.value + '%'">
+                </div>
+
+                <button onclick="saveJob()" class="save-btn" style="margin-top:15px;">保存</button>
+                <button
+                    onclick="closeModal('job-modal-overlay'); document.getElementById('job-menu-overlay').style.display='flex';"
+                    style="width:100%; border:none; background:none; margin-top:10px; color:#666;">キャンセル</button>
+            </div>
+        </div>
+        <div id="modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>予定の追加</h3><input type="text" id="task-name" placeholder="予定の名前" autocomplete="off">
+                <div id="color-picker-area"
+                    style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0;"></div><button
+                    onclick="saveTask()" class="save-btn">保存</button>
+                <button onclick="closeModal('modal-overlay')"
+                    style="width:100%; border:none; background:none; margin-top:10px;">キャンセル</button>
+            </div>
+        </div>
+
+        <div id="edit-modal-overlay" class="modal-overlay">
+            <div class="modal">
+                <h3>予定の削除</h3>
+                <p id="edit-info" style="text-align:center; font-weight:bold;"></p><button id="final-delete-btn"
+                    class="save-btn" style="background:var(--danger);">削除</button><button
+                    onclick="closeModal('edit-modal-overlay')"
+                    style="width:100%; border:none; background:none; margin-top:10px;">戻る</button>
+            </div>
+        </div>
+
+
+        <div id="job-list-modal-overlay" class="modal-overlay">
+            <div class="modal" style="max-height: 80vh; overflow-y: auto;">
+                <h3>案件一覧（全履歴）</h3>
+                <div id="all-job-list-container"></div>
+
+                <button onclick="closeModal('job-list-modal-overlay'); openJobMenuModal();" class="save-btn"
+                    style="background:#666;">閉じる</button>
+            </div>
+        </div>
+
+
+        <div id="shift-modal-overlay" class="modal-overlay">
+            <div class="modal" style="max-height:90vh; overflow-y:auto;">
+                <h3>シフト・時間設定</h3>
+
+                <div style="border-bottom:1px solid #eee; margin-bottom:10px; padding-bottom:10px;">
+                    <label style="font-weight:bold; font-size:12px;">勤務時間</label>
+                    <div style="display:flex; gap:5px; align-items:center;">
+                        <input type="time" id="set-shift-start" style="margin:0;"> ～ <input type="time"
+                            id="set-shift-end" style="margin:0;">
+                    </div>
+                </div>
+
+                <div style="border-bottom:1px solid #eee; margin-bottom:10px; padding-bottom:10px;">
+                    <label style="font-weight:bold; font-size:12px;">通勤時間（片道）</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="set-commute-h" placeholder="時間" style="width:50%; margin:0;">
+                        <input type="number" id="set-commute-m" placeholder="分" style="width:50%; margin:0;">
+                    </div>
+                </div>
+
+                <div style="border-bottom:1px solid #eee; margin-bottom:10px; padding-bottom:10px;">
+                    <label style="font-weight:bold; font-size:12px;">昼休み（開始・終了）</label>
+                    <div style="display:flex; gap:5px; align-items:center;">
+                        <input type="time" id="set-break-start" style="margin:0;"> ～ <input type="time"
+                            id="set-break-end" style="margin:0;">
+                    </div>
+                </div>
+
+                <div id="batch-shift-area">
+                    <label style="font-size:12px; font-weight:bold;">曜日一括反映</label>
+                    <div id="weekday-checks"
+                        style="display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:5px;">
+                        <label><input type="checkbox" value="1">月</label>
+                        <label><input type="checkbox" value="2">火</label>
+                        <label><input type="checkbox" value="3">水</label>
+                        <label><input type="checkbox" value="4">木</label>
+                        <label><input type="checkbox" value="5">金</label>
+                        <label><input type="checkbox" value="6">土</label>
+                        <label><input type="checkbox" value="0">日</label>
+                    </div>
+                    <button onclick="applyBatchShift()" class="save-btn"
+                        style="background:var(--shift);">この設定を一括反映</button>
+                    <button onclick="saveDefShift()" class="save-btn"
+                        style="background:#eee; color:#333; margin-top:5px;">基本設定として保存</button>
+                </div>
+
+                <button id="save-day-shift-btn" onclick="saveDayShift()" class="save-btn hidden">この日のみ保存</button>
+                <button onclick="closeModal('shift-modal-overlay')"
+                    style="width:100%; border:none; background:none; margin-top:10px; padding:10px;">閉じる</button>
+            </div>
+        </div>
+
+        <div id="app-notice-bar" style="
+    display: none; 
+    position: fixed; 
+    top: 20px; 
+    left: 5%;         /* 画面の左から5%の位置（余白） */
+    right: 5%;        /* 画面の右から5%の位置（余白） */
+    width: 90%;       /* 画面幅の90%を使う */
+    max-width: 400px; /* PCなど大きな画面では広がりすぎないように */
+    margin: 0 auto;   /* 中央寄せの予備 */
+    background: rgba(40, 40, 40, 0.95); 
+    color: white; 
+    padding: 15px; 
+    border-radius: 12px; 
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5); 
+    z-index: 10000;   /* 他の要素より絶対手前 */
+    border: 1px solid #555;
+    box-sizing: border-box; /* パディングを含めた幅計算にする */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px); /* iPhone用のぼかし */
+">
+            <div id="notice-title"
+                style="font-weight:bold; font-size:16px; color:#ffdd00; margin-bottom:8px; border-bottom:1px solid #555; padding-bottom:5px;">
+            </div>
+            <div id="notice-body" style="font-size:14px; line-height:1.5; white-space:pre-wrap; word-wrap: break-word;">
+            </div>
+            <div style="text-align:center; font-size:11px; margin-top:10px; opacity:0.6; font-style:italic;">タップして閉じる
+            </div>
+        </div>
+
+        <script>
+            let scrollInterval = null;
+            let currentScrollSpeed = 0;
+            let isEditingFromList = false; // ★この行を追加（目印になります）
+            let currentViewDate = new Date(); currentViewDate.setDate(1);
+            const STORAGE_KEY = 'TimeManager_V22';
+            let appData = {
+                tasks: {},
+                longTermJobs: [],
+                singleShifts: {},
+                singleSleeps: {},
+                defShift: { start: 36, end: 68, commuteH: 0, commuteM: 0, breakStart: "12:00", breakEnd: "13:00" },
+                defSleep: { start: 0, end: 26 },
+                settings: { handleSide: 'right' } // ★ここで最初から定義しておくと安心！
+            };
+
+            let holidayData = {};
+            const COLORS = ["#ff99bb", "#98fb98", "#87cefa", "#ffcc99", "#e0bbff", "#ffff99", "#ffcccc", "#d3d3d3"];
+            let selectedColor = COLORS[0], inputMode = 'normal', selectedDate = "";
+
+            let touchTimer = null;
+            let longPressed = false;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let isDraggingTask = false; // タスク操作中フラグ
+
+            let isDragging = false, dragMode = null, startIdx = null, activeTaskId = null, moveOffset = 0, tempRange = { start: 0, length: 0 }, lastTouchY = 0;
+
+            function toggleTimelineUI(show) {
+                const remote = document.getElementById('scroll-remote-control');
+                if (!remote) return;
+
+                if (show) {
+                    // スマホ画面（768px以下）の時だけ表示する
+                    if (window.innerWidth <= 768) {
+                        remote.style.setProperty('display', 'flex', 'important');
+                    }
+                } else {
+                    remote.style.setProperty('display', 'none', 'important');
+                }
+
+                // ついでに日付移動ボタン(side-prev, side-next)もここで同様に制御
+                const sideBtns = [document.getElementById('side-prev'), document.getElementById('side-next')];
+                sideBtns.forEach(btn => {
+                    if (btn) btn.style.display = show ? 'flex' : 'none';
+                });
+            }
+
+            function saveJob() {
+                const id = document.getElementById('edit-job-id').value;
+                const name = document.getElementById('job-name').value;
+                const progress = parseInt(document.getElementById('job-progress').value) || 0;
+                const start = document.getElementById('job-start').value;
+                const end = document.getElementById('job-end').value;
+                const totalH = parseFloat(document.getElementById('job-total-h').value) || 0;
+                const memo = document.getElementById('job-memo').value;
+                toggleTimelineUI(false);
+
+
+                if (!name) { alert("案件名を入力してください"); return; }
+
+                if (id) {
+                    const idx = appData.longTermJobs.findIndex(j => j.id == id);
+                    if (idx !== -1) {
+                        appData.longTermJobs[idx].progress = progress; // 反映！
+                        appData.longTermJobs[idx].name = name;
+                        appData.longTermJobs[idx].start = start;
+                        appData.longTermJobs[idx].end = end;
+                        appData.longTermJobs[idx].totalH = totalH;
+                        appData.longTermJobs[idx].memo = memo;
+                    }
+                } else {
+                    const newJob = {
+                        id: Date.now(),
+                        name: name,
+                        progress: progress,
+                        start: start,
+                        end: end,
+                        totalH: totalH,
+                        memo: memo,
+                        progress: 0,
+                        isCompleted: false
+                    };
+                    appData.longTermJobs.push(newJob);
+                }
+
+                saveData();
+
+                // 1. 入力モーダルを閉じる
+                closeModal('job-modal-overlay');
+
+                // 2. メニュー画面（新規・一覧ボタンがある画面）を確実に表示する
+                // 余計な関数（openJobListなど）を呼ばず、表示だけを変えるのがコツです
+                const menuModal = document.getElementById('job-menu-overlay');
+                if (menuModal) {
+                    menuModal.style.display = 'flex';
+                }
+                openJobList();
+                // 3. 背景のカレンダー表示を更新する
+                renderCalendar();
+                if (typeof updateJobArea === 'function') updateJobArea();
+            }
+
+            function dtToStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+            function loadData() {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    appData = JSON.parse(saved);
+                    // ★保存データに settings がなかった場合（アップデート用）
+                    if (!appData.settings) {
+                        appData.settings = { handleSide: 'right' };
+                    }
+                }
+            }
+            function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }
+            function indexToTime(i) { return `${String(Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`; }
+            function timeToIndex(t) { const [h, m] = t.split(':').map(Number); return h * 4 + Math.floor(m / 15); }
+            function formatDur(l) {
+                const h = Math.floor(l / 4);
+                const m = (l % 4) * 15;
+                if (h > 0 && m > 0) return `${h}時間${m}分`;
+                if (h > 0) return `${h}時間`;
+                return `${m}分`;
+            }
+            function isJobVisibleOnDate(job, dateStr) {
+                const targetDate = new Date(dateStr);
+                const startDate = new Date(job.start);
+                const endDate = new Date(job.end);
+
+                // 1. そもそも案件の期間内かチェック
+                if (targetDate < startDate || targetDate > endDate) return false;
+
+                // 2. 「完了」または「削除」されている場合
+                if (job.isCompleted || job.isDeleted) {
+                    // 完了/削除した日の「翌日」以降なら非表示にする
+                    // ※job.completedDate や job.deletedDate が保存されている必要があります
+                    const actionDateStr = job.completedDate || job.deletedDate;
+                    if (actionDateStr) {
+                        const actionDate = new Date(actionDateStr);
+                        if (targetDate > actionDate) return false;
+                    }
+                }
+
+                return true;
+            }
+            // --- ここを修正してください ---
+
+            function openJobMenuModal() {
+                document.getElementById('job-menu-overlay').style.display = 'flex';
+                // モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+                const remote = document.getElementById('scroll-remote-control');
+                if (remote) {
+                    remote.style.display = 'none';
+                }
+                toggleTimelineUI(false);
+            }
+
+
+            function renderCalendar() {
+                const grid = document.getElementById('calendar-grid');
+                grid.innerHTML = "";
+
+                const y = currentViewDate.getFullYear();
+                const m = currentViewDate.getMonth();
+                const holidays = holidayData;
+
+                // タイトル更新
+                document.getElementById('view-title').textContent = `${y}年 ${m + 1}月`;
+
+                // 1日の曜日(0:日〜6:土)と、その月の最終日を取得
+                const firstDay = new Date(y, m, 1).getDay();
+                const lastDate = new Date(y, m + 1, 0).getDate();
+
+                // ★ 前月の最終日を取得
+                const prevMonthLastDate = new Date(y, m, 0).getDate();
+
+                // 1. 前月の末尾を埋める
+                for (let i = firstDay - 1; i >= 0; i--) {
+                    const date = prevMonthLastDate - i;
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.className = 'calendar-day other-month'; // 専用のクラスを付与
+                    emptyDiv.innerHTML = `<div class="day-num">${date}</div>`;
+                    grid.appendChild(emptyDiv);
+                }
+
+                // 2. 日付を1日から末日まで描画
+                for (let i = 1; i <= lastDate; i++) {
+                    const dStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const day = document.createElement('div');
+                    day.className = 'calendar-day';
+
+                    // 各種状態のクラス付け
+                    if (inputMode === 'shift') day.classList.add('shift-mode-active');
+                    if (dStr === dtToStr(new Date())) day.classList.add('is-today');
+
+                    let html = "";
+                    // 祝日判定
+                    if (holidays[dStr]) {
+                        day.classList.add('is-holiday');
+                        html += `<div class="holiday-name">${holidays[dStr]}</div>`;
+                    }
+                    html += `<div class="day-num">${i}</div>`;
+
+                    // 表示アイテム（シフトと案件）の作成
+                    let displayItems = [];
+                    if (appData.singleShifts[dStr]) {
+                        displayItems.push(`<div class="job-band shift-band">勤:${indexToTime(appData.singleShifts[dStr].start)}</div>`);
+                    }
+                    (appData.longTermJobs || []).filter(j => isJobVisibleOnDate(j, dStr)).forEach(j => {
+                        displayItems.push(`<div class="job-band ${j.isDeleted ? 'deleted' : ''}">${j.name}</div>`);
+                    });
+
+                    // 2件まで表示、それ以上は「他x件」
+                    displayItems.slice(0, 2).forEach(item => html += item);
+                    if (displayItems.length > 2) {
+                        html += `<div style="font-size:8px;color:#888;text-align:right">他${displayItems.length - 2}件</div>`;
+                    }
+
+                    day.innerHTML = html;
+
+                    // クリックイベント
+                    day.onclick = () => {
+                        if (inputMode === 'shift') {
+                            if (appData.singleShifts[dStr]) delete appData.singleShifts[dStr];
+                            else appData.singleShifts[dStr] = { ...appData.defShift };
+                            saveData();
+                            renderCalendar();
+                        } else {
+                            showDay(dStr);
+                        }
+                    };
+                    grid.appendChild(day);
+                }
+                // 3. 翌月の始まりを埋める（その週の土曜日まで）
+                const lastDayOfOfMonth = new Date(y, m + 1, 0).getDay(); // 今月末日の曜日 (0:日〜6:土)
+                const nextCells = 6 - lastDayOfOfMonth; // 土曜日(6)までの残りのマス数
+
+                for (let i = 1; i <= nextCells; i++) {
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.className = 'calendar-day other-month';
+                    emptyDiv.innerHTML = `<div class="day-num">${i}</div>`;
+                    grid.appendChild(emptyDiv);
+                }
+                const remote = document.getElementById('scroll-remote-control');
+                if (remote) {
+                    remote.style.display = 'none';
+                }
+            }
+
+
+
+
+            function init() {
+                loadData();
+                renderCalendar(); // まず一度描画
+                fetchHolidays();  // 祝日を取得して再描画
+
+                const dayScreen = document.getElementById('day-screen');
+
+
+                document.getElementById('final-delete-btn').onclick = deleteTask;
+                document.getElementById('month-reset-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    const y = currentViewDate.getFullYear(), m = currentViewDate.getMonth() + 1;
+                    document.getElementById('reset-confirm-msg').textContent = `${y}年${m}月の「予定」と「シフト」をすべて削除します。よろしいですか？`;
+                    document.getElementById('reset-modal-overlay').style.display = 'flex';
+                };
+
+                const cp = document.getElementById('color-picker-area');
+                if (cp) {
+                    cp.innerHTML = "";
+                    COLORS.forEach(c => {
+                        const b = document.createElement('div');
+                        b.style.height = '35px'; b.style.borderRadius = '6px'; b.style.background = c; b.style.border = '3px solid transparent';
+                        b.onclick = () => {
+                            selectedColor = c;
+                            [...cp.children].forEach(x => x.style.borderColor = 'transparent');
+                            b.style.borderColor = '#333';
+                        };
+                        cp.appendChild(b);
+                    });
+                }
+            }
+
+
+
+            function openJobModal(id = null) {
+                const listModal = document.getElementById('job-list-modal-overlay');
+                isEditingFromList = (listModal && listModal.style.display === 'flex');
+                closeModal('job-list-modal-overlay');
+                toggleTimelineUI(false);
+
+                if (id) {
+                    const j = appData.longTermJobs.find(x => x.id == id);
+                    if (j) {
+                        document.getElementById('edit-job-id').value = id;
+                        document.getElementById('job-name').value = j.name;
+                        document.getElementById('job-start').value = j.start;
+                        document.getElementById('job-end').value = j.end;
+                        document.getElementById('job-total-h').value = j.totalH;
+                        document.getElementById('job-memo').value = j.memo || ""; // メモを読み込み
+                        document.getElementById('job-progress').value = j.progress || 0;
+                        document.getElementById('job-progress-display').textContent = (j.progress || 0) + "%";
+                    }
+                } else {
+                    // 新規登録時はすべて空にする
+                    document.getElementById('edit-job-id').value = "";
+                    document.getElementById('job-name').value = "";
+                    document.getElementById('job-start').value = selectedDate || dtToStr(new Date());
+                    document.getElementById('job-end').value = selectedDate || dtToStr(new Date());
+                    document.getElementById('job-total-h').value = "";
+                    document.getElementById('job-memo').value = ""; // メモを空に
+                    document.getElementById('job-progress').value = 0;
+                    document.getElementById('job-progress-display').textContent = "0%";
+                }
+                document.getElementById('job-modal-overlay').style.display = 'flex';
+                // モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+                const remote = document.getElementById('scroll-remote-control');
+                if (remote) {
+                    remote.style.display = 'none';
+                }
+            }
+
+            function openShiftModal() {
+                // 既存データ or 基本設定を取得
+                const s = (selectedDate && appData.singleShifts[selectedDate]) ? appData.singleShifts[selectedDate] : appData.defShift;
+                toggleTimelineUI(false);
+                // 各入力欄に値をセット
+                document.getElementById('set-shift-start').value = indexToTime(s.start);
+                document.getElementById('set-shift-end').value = indexToTime(s.end);
+                document.getElementById('set-commute-h').value = s.commuteH || 0;
+                document.getElementById('set-commute-m').value = s.commuteM || 0;
+                document.getElementById('set-break-start').value = s.breakStart || "12:00";
+                document.getElementById('set-break-end').value = s.breakEnd || "13:00";
+
+                document.getElementById('batch-shift-area').className = selectedDate ? 'hidden' : '';
+                document.getElementById('save-day-shift-btn').className = selectedDate ? 'save-btn' : 'hidden';
+                document.getElementById('shift-modal-overlay').style.display = 'flex';
+                // モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+            }
+
+            function saveDayShift() {
+                appData.singleShifts[selectedDate] = {
+                    start: timeToIndex(document.getElementById('set-shift-start').value),
+                    end: timeToIndex(document.getElementById('set-shift-end').value),
+                    commuteH: parseInt(document.getElementById('set-commute-h').value) || 0,
+                    commuteM: parseInt(document.getElementById('set-commute-m').value) || 0,
+                    breakStart: document.getElementById('set-break-start').value,
+                    breakEnd: document.getElementById('set-break-end').value
+                };
+                saveDataAndRefresh();
+                closeModal('shift-modal-overlay');
+            }
+
+            function saveDefShift() {
+                appData.defShift = {
+                    start: timeToIndex(document.getElementById('set-shift-start').value),
+                    end: timeToIndex(document.getElementById('set-shift-end').value),
+                    commuteH: parseInt(document.getElementById('set-commute-h').value) || 0,
+                    commuteM: parseInt(document.getElementById('set-commute-m').value) || 0,
+                    breakStart: document.getElementById('set-break-start').value,
+                    breakEnd: document.getElementById('set-break-end').value
+                };
+                saveData();
+                alert("基本設定を保存しました");
+            }
+
+            function openJobMenuModal() {
+                document.getElementById('job-menu-overlay').style.display = 'flex';
+                // モーダルを開く処理のどこかに1行追加
+                toggleTimelineUI(false);
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+            }
+
+            function executeMonthlyReset() {
+                const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+                const prefix = `${y}-${m}`;
+
+                // データを消す
+                Object.keys(appData.tasks).forEach(d => { if (d.startsWith(prefix)) delete appData.tasks[d]; });
+                Object.keys(appData.singleShifts).forEach(d => { if (d.startsWith(prefix)) delete appData.singleShifts[d]; });
+
+                // 保存する
+                saveData();
+
+                // モーダルを閉じる
+                closeModal('reset-modal-overlay');
+
+                // ★【ここが重要】判定を無視して、全部強制的に描き直す！
+                renderCalendar();  // カレンダーを更新
+                renderTimeline();  // タイムラインを更新
+                updateFreeTime();  // 空き時間表示も更新
+            }
+
+            function renderTimeline() {
+                const tl = document.getElementById("timeline");
+                const container = document.getElementById("timeline-container"); // containerを取得
+                if (!tl || !container) return;
+
+                tl.innerHTML = ""; // 一旦リセット
+                const oldLabels = container.querySelectorAll('.time-label');
+                oldLabels.forEach(l => l.remove());
+
+                const tasks = appData.tasks[selectedDate] || [];
+                const shift = appData.singleShifts[selectedDate] || appData.defShift;
+                const sleep = appData.singleSleeps[selectedDate] || appData.defSleep;
+
+                const commuteIdx = (shift.commuteH || 0) * 4 + Math.floor((shift.commuteM || 0) / 15);
+                const breakS = timeToIndex(shift.breakStart || "12:00");
+                const breakE = timeToIndex(shift.breakEnd || "13:00");
+                toggleTimelineUI(true);
+
+
+                // 96個（24時間分）のマスを生成
+                for (let i = 0; i < 96; i++) {
+                    const slot = document.createElement("div");
+                    slot.className = "time-slot";
+                    slot.dataset.idx = i;
+
+                    slot.style.position = "absolute";
+                    slot.style.top = (i * 20) + "px";
+                    slot.style.height = "20px";
+                    slot.style.width = "100%";
+                    slot.style.borderBottom = "1px solid #eee";
+                    slot.style.boxSizing = "border-box";
+
+                    // 時刻ラベル (1時間ごと)
+                    if (i % 4 === 0) {
+                        const label = document.createElement("div");
+                        label.className = "time-label";
+                        label.textContent = Math.floor(i / 4) + ":00";
+
+                        // ★元の位置設定
+                        label.style.position = "absolute";
+                        label.style.left = "5px";  // containerの左端からの位置（自由に調整OK！）
+                        label.style.width = "45px";
+                        label.style.textAlign = "right";
+
+                        // ★微調整：線の真横に文字が来るように
+                        label.style.top = (i * 20 - 10) + "px";
+                        label.style.lineHeight = "20px";
+
+                        label.style.fontSize = "13px";
+                        label.style.color = "#888";
+                        label.style.fontWeight = "bold";
+                        label.style.pointerEvents = "none";
+                        label.style.zIndex = "20"; // 睡眠・仕事背景より前に出す
+
+                        label.textContent = Math.floor(i / 4) + ":00";
+                        container.appendChild(label);
+                    }
+
+                    tl.appendChild(slot);
+
+                    // --- 背景色判定 ---
+                    const isSleep = (sleep.start < sleep.end) ? (i >= sleep.start && i < sleep.end) : (i >= sleep.start || i < sleep.end);
+                    const hasTodayShift = appData.singleShifts[selectedDate];
+                    const isWork = (hasTodayShift && i >= shift.start && i < shift.end);
+                    const isCommute = (hasTodayShift && ((i >= shift.start - commuteIdx && i < shift.start) || (i >= shift.end && i < shift.end + commuteIdx)));
+                    const isBreak = (hasTodayShift && i >= breakS && i < breakE && isWork);
+
+                    if (isSleep) slot.classList.add("fixed-busy");
+                    else if (isBreak) slot.classList.add("break-busy");
+                    else if (isWork) slot.classList.add("shift-busy");
+                    else if (isCommute) slot.classList.add("commute-busy");
+
+                    // --- 予定ブロックの描画 ---
+                    const t = tasks.find(x => i === x.start);
+                    if (t) {
+                        const el = document.createElement("div");
+                        el.className = "custom-task";
+
+                        el.style.backgroundColor = t.color;
+                        el.style.height = (t.length * 20 - 1) + "px";
+                        el.style.position = "absolute";
+                        el.style.top = "0";
+                        el.style.left = "2px"; el.style.right = "2px";
+                        el.style.zIndex = "10";
+                        el.style.display = "flex"; el.style.alignItems = "center";
+                        el.style.borderRadius = "4px"; el.style.boxSizing = "border-box";
+
+                        // --- テキスト ---
+                        const txt = document.createElement("span");
+                        txt.style.cssText = "flex:1; overflow:hidden; white-space:nowrap; pointer-events:none; display:flex; flex-direction:column; line-height:1.1; padding-right:80px;"; // 右側に40pxの余白
+                        const totalMin = t.length * 15;
+                        const timeStr = totalMin >= 60 ? `${Math.floor(totalMin / 60)}時間${totalMin % 60}分` : `${totalMin}分`;
+                        txt.innerHTML = `<b style="font-size:10px;">${t.name}</b><span style="font-size:8px; opacity:0.8;">${timeStr}</span>`;
+
+                        // --- ボタングループ ---
+                        const btnGroup = document.createElement('div');
+
+                        btnGroup.style.position = "absolute";
+                        btnGroup.style.right = "40px"; // 右端のハンドルの分(30px)＋α 空ける
+                        btnGroup.style.top = "50%";
+                        btnGroup.style.transform = "translateY(-50%)";
+                        btnGroup.style.display = "flex";
+                        btnGroup.style.gap = "5px";
+                        btnGroup.style.zIndex = "10";
+
+                        // 編集ボタン
+                        const eb = document.createElement('button');
+                        eb.className = 'del-btn-mini'; eb.innerHTML = '✏️';
+                        eb.onclick = eb.ontouchend = (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            activeTaskId = t.id;
+                            document.getElementById('task-name').value = t.name;
+                            document.getElementById('modal-overlay').style.display = 'flex';
+                            document.querySelectorAll('.side-nav').forEach(s => s.style.display = 'none');
+                        };
+                        eb.ontouchstart = (e) => e.stopPropagation();
+
+                        // 削除ボタン
+                        const db = document.createElement('button');
+                        db.className = 'del-btn-mini'; db.innerHTML = '×';
+                        db.onclick = db.ontouchend = (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            activeTaskId = t.id;
+                            document.getElementById('edit-info').textContent = t.name;
+                            document.getElementById('edit-modal-overlay').style.display = 'flex';
+                            document.querySelectorAll('.side-nav').forEach(s => s.style.display = 'none');
+                        };
+                        // タスクブロック(el)の中にハンドルを追加
+                        const dragHandle = document.createElement('div');
+                        dragHandle.className = 'task-scroll-handle';
+                        dragHandle.innerHTML = '↕️'; // または ☰
+                        // ドラッグハンドルのスタイル微調整
+                        dragHandle.style.cssText = `
+                            position: absolute;
+                            right: 0;
+                            top: 0;
+                            bottom: 0;
+                            width: 30px;
+                            background: rgba(0,0,0,0.05); /* ほんの少しだけ色をつける */
+                            border-left: 1px solid rgba(0,0,0,0.1);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 16px;
+                            cursor: grab; /* PCで掴めることを示す */
+                            touch-action: none;
+                            z-index: 5;
+           `;
+                        dragHandle.innerHTML = '⋮⋮'; // 縦の三点リーダー風（よくあるドラッグアイコン）
+
+                        // ハンドルを触った時のイベント
+                        dragHandle.ontouchstart = (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            if (navigator.vibrate) navigator.vibrate(30);
+
+                            // 即座に移動モードでドラッグ開始
+                            startDrag(e, 'move', t.id);
+
+                            // このハンドルを掴んでいる間は、端っこに行ったら自動スクロールを有効にする
+                            isDraggingTaskWithHandle = true;
+                        };
+
+                        el.appendChild(dragHandle);
+                        db.ontouchstart = (e) => e.stopPropagation();
+
+                        btnGroup.appendChild(eb);
+                        btnGroup.appendChild(db);
+                        el.appendChild(txt);
+                        el.appendChild(btnGroup);
+
+                        // --- 予定ブロック自体のイベント（移動とリサイズ） ---
+                        const onTaskAction = (e) => {
+                            if (e.target.closest('button')) return;
+                            e.stopPropagation();
+                            e.preventDefault();
+
+                            const rect = el.getBoundingClientRect();
+                            const touchY = e.touches ? e.touches[0].clientY : e.clientY;
+                            const offsetY = touchY - rect.top;
+                            let edgeSize = 15; // 基本は15px
+
+                            // 予定が短い（例えば 60px = 45分以下）場合は、端っこを 10px に縮小
+                            if (rect.height < 60) {
+                                edgeSize = 10;
+                            }
+                            // さらに短い（20px = 15分）場合は、上下5pxずつにする
+                            if (rect.height <= 25) {
+                                edgeSize = 5;
+                            }
+
+                            if (offsetY < edgeSize) {
+                                startDrag(e, 'resize-top', t.id);
+                            } else if (offsetY > rect.height - edgeSize) {
+                                startDrag(e, 'resize-bottom', t.id);
+                            } else {
+                                moveOffset = Math.floor(offsetY / 20);
+                                touchTimer = setTimeout(() => {
+                                    if (navigator.vibrate) navigator.vibrate(50);
+                                    startDrag(e, 'move', t.id);
+                                    updateDragDisplay();
+                                }, 500);
+                            }
+                        };
+
+                        el.onmousedown = onTaskAction;
+                        el.ontouchstart = onTaskAction;
+                        el.ontouchend = el.onmouseup = () => clearTimeout(touchTimer);
+                        el.ontouchmove = (e) => {
+                            if (!isDragging) clearTimeout(touchTimer);
+                        };
+
+                        slot.appendChild(el);
+                    } // ここで if (t) の閉じ
+
+                    // --- スロット側のイベント（新規作成用） ---
+                    slot.onmousedown = (e) => {
+
+                        if (e.target.closest('.custom-task')) return; // 予定の上ならスルー
+
+                        isDragging = true;
+                        dragMode = 'create';
+                        startIdx = i; // ループの i を使用
+                        lastTouchY = e.clientY; // マウスの現在地を記録
+
+                        updateDragDisplay(); // 描画を即実行
+                    };
+
+                    slot.ontouchstart = (e) => {
+                        if (e.target.closest('.custom-task')) return;
+                        isDragging = true;
+                        dragMode = 'create';
+                        startIdx = i;
+                        lastTouchY = e.touches[0].clientY;
+                        const touch = e.touches[0];
+                        touchStartX = touch.clientX;
+                        touchStartY = touch.clientY;
+                        longPressed = false;
+                        isDraggingTask = true;
+
+                        touchTimer = setTimeout(() => {
+                            longPressed = true;
+                            isDragging = true;
+                            isDraggingTask = true;
+                            dragMode = 'create';
+                            startIdx = i;
+                            lastTouchY = touch.clientY;
+                            if (navigator.vibrate) navigator.vibrate(50);
+                            updateDragDisplay();
+                        }, 600);
+                    };
+
+                    tl.appendChild(slot);
+                } // ここで for ループの閉じ
+
+                if (typeof updateFreeTime === 'function') updateFreeTime();
+                setupScrollRemote();
+                const remote = document.getElementById('scroll-remote-control');
+                if (remote) {
+                    remote.style.display = 'flex';
+                }
+
+            } // ここで renderTimeline 関数の閉じ
+
+
+            // 他の予定と重なっているかチェックする関数
+            function isColliding(targetTask) {
+                const tasks = appData.tasks[selectedDate] || [];
+                return tasks.some(t => {
+                    if (t.id === targetTask.id) return false;
+                    const targetEnd = targetTask.start + targetTask.length;
+                    const tEnd = t.start + t.length;
+                    return targetTask.start < tEnd && targetEnd > t.start;
+                });
+            }
+
+            // --- 3. ドラッグ中の移動を処理する関数 ---
+            function handleMove(e) {
+                if (!isDragging) return; // ドラッグ中でなければ何もしない
+
+                const event = e.touches ? e.touches[0] : e;
+
+                // スクロールを完全に止める（作成中や移動中に画面が逃げないように）
+                if (e.cancelable) e.preventDefault();
+
+                lastTouchY = event.clientY;
+
+                // 自動スクロール（指が画面の上下端に達した時だけ中身を動かす）
+                // これは予定を「朝の方」や「夜の方」へ長く伸ばしたい時に便利なので残します
+                if (lastTouchY < 100) startAutoScroll(-10);
+                else if (lastTouchY > window.innerHeight - 100) startAutoScroll(10);
+                else stopAutoScroll();
+
+                // 見た目の更新（予定の影を伸ばしたり動かしたりする）
+                updateDragDisplay();
+            }
+
+
+
+
+            function updateDragDisplay() {
+                // 1. ドラッグ中かチェック
+                if (!isDragging) return;
+
+                // 2. タイムラインの基準位置を取得
+                const tl = document.getElementById('timeline');
+                tl.addEventListener('touchstart', (e) => {
+                    // 予定作成（ドラッグ）が始まったら、画面全体のスクロールを禁止する
+                    if (e.target.id === 'timeline' || e.target.classList.contains('time-slot')) {
+                        // e.preventDefault(); // これを入れるとブラウザのスクロールが止まります
+                    }
+                }, { passive: false });
+                const container = document.getElementById('timeline-container');
+                const tlRect = tl.getBoundingClientRect();
+
+                // 3. マウスの現在地(lastTouchY)から、タイムライン上の何マス目か計算
+                const relativeY = lastTouchY - tlRect.top;
+                let i = Math.round(relativeY / 20);
+                i = Math.max(0, Math.min(95, i));
+
+                let t = null;
+                if (dragMode === 'move' || dragMode === 'resize-top' || dragMode === 'resize-bottom') {
+                    t = (appData.tasks[selectedDate] || []).find(x => x.id === activeTaskId);
+                }
+
+                if (dragMode === 'create') {
+                    // startIdx が undefined の場合、今の位置を開始地点にする（保険）
+                    if (typeof startIdx === 'undefined') startIdx = i;
+
+                    const [min, max] = [startIdx, i].sort((a, b) => a - b);
+                    updateGuide(min, max);
+
+                    const g = document.getElementById('drag-guide');
+                    if (g) {
+                        // hiddenクラスを外して表示させる
+                        g.classList.remove('hidden');
+
+                        const length = max - min + 1;
+                        // ここで時間を計算して表示
+                        const totalMin = length * 15;
+                        const h = Math.floor(totalMin / 60);
+                        const m = totalMin % 60;
+                        const timeStr = h > 0 ? `${h}時間${m}分` : `${m}分`;
+
+                        if (isColliding({ id: null, start: min, length: length })) {
+                            g.classList.add('collision');
+                            g.textContent = "重なっています";
+                        } else {
+                            g.classList.remove('collision');
+                            g.textContent = ` ${timeStr}`;
+                        }
+                    }
+                }
+                else if (dragMode === 'move') {
+                    if (!t) return;
+                    let ns = Math.max(0, Math.min(96 - t.length, i - moveOffset));
+                    showPreview(ns, t.length, t.color);
+                }
+                else if (dragMode === 'resize-bottom') {
+                    if (!t) return;
+                    let newLen = Math.max(1, i - t.start + 1);
+                    newLen = Math.min(96 - t.start, newLen);
+                    showPreview(t.start, newLen, t.color);
+                }
+                else if (dragMode === 'resize-top') {
+                    if (!t) return;
+                    const currentEnd = t.start + t.length;
+                    let newStart = Math.max(0, Math.min(currentEnd - 1, i));
+                    let newLen = currentEnd - newStart;
+                    showPreview(newStart, newLen, t.color);
+                }
+
+                // リサイズ時の衝突チェック
+                const pre = document.querySelector('.move-preview');
+                if (pre && t) {
+                    // showPreviewでセットされたdatasetの値を使って判定
+                    const ns = parseInt(pre.dataset.ns);
+                    const nl = parseInt(pre.dataset.nl);
+
+                    if (isColliding({ id: t.id, start: ns, length: nl })) {
+                        pre.classList.add('collision');
+                    } else {
+                        pre.classList.remove('collision');
+                    }
+
+                }
+                // ★自動スクロールのロジック
+
+                const isRemoteActive = (dragMode === null && !isDragging); // リモコン操作中か？
+
+                if (dragMode === 'create') {
+                    // 予定作成中は、自動スクロールを強制停止
+                    stopAutoScroll();
+                } else if (isDragging) {
+                    // 移動やリサイズ中も、一旦止めて様子を見るのが安全
+                    handleAutoScroll(lastTouchY);
+                }
+            }
+
+            // 移動・作成中の座標をチェックして、端にいたらスクロールを開始する関数
+            function handleAutoScroll(clientY) {
+                if (!isDragging || dragMode === 'create') {
+                    stopAutoScroll();
+                    return;
+                }
+
+                const threshold = 70;
+                const upSpeed = -10;
+                const downSpeed = 8;
+
+                if (clientY < threshold) {
+                    startAutoScroll(upSpeed);
+                } else if (clientY > window.innerHeight - threshold) {
+                    startAutoScroll(downSpeed);
+                } else {
+                    stopAutoScroll();
+                }
+            }
+
+
+            // プレビュー表示用の共通パーツ（重複を減らすため）
+            function showPreview(start, length, color) {
+                let pre = document.querySelector('.move-preview');
+                if (!pre) {
+                    pre = document.createElement('div');
+                    pre.className = 'move-preview';
+                    document.getElementById('timeline').appendChild(pre);
+                }
+
+                // dataset に値を保存（衝突判定で使用）
+                pre.dataset.ns = start;
+                pre.dataset.nl = length;
+
+                // スタイル設定
+                pre.style.top = (start * 20) + "px";
+                pre.style.height = (length * 20 - 1) + "px";
+                pre.style.backgroundColor = color;
+                pre.style.opacity = "0.7";
+                pre.style.position = "absolute";
+                pre.style.left = "2px";
+                pre.style.right = "2px";
+                pre.style.zIndex = "100";
+                pre.style.borderRadius = "4px";
+                pre.style.display = "flex";
+                pre.style.alignItems = "center";
+                pre.style.justifyContent = "center";
+                pre.style.color = "white";
+                pre.style.fontSize = "12px";
+                pre.style.fontWeight = "bold";
+                pre.style.pointerEvents = "none";
+
+                // --- ここで時間を計算して表示 ---
+                const totalMin = length * 15;
+                const hours = Math.floor(totalMin / 60);
+                const mins = totalMin % 60;
+
+                let timeText = "";
+                if (hours > 0) {
+                    timeText = `${hours}時間${mins > 0 ? mins + '分' : ''}`;
+                } else {
+                    timeText = `${mins}分`;
+                }
+
+                pre.textContent = timeText;
+            }
+
+
+            // --- オートスクロール関連 ---
+            function startAutoScroll(speed) {
+                // すでに同じ方向にスクロール中なら何もしない
+                if (currentScrollSpeed === speed) return;
+
+                // 違う方向、または停止中なら一旦クリア
+                stopAutoScroll();
+
+                currentScrollSpeed = speed;
+                const container = document.getElementById('timeline-container');
+
+                scrollInterval = setInterval(() => {
+                    if (!container) return;
+                    console.log(container.scrollTop);
+                    // スクロール実行
+                    container.scrollTop += speed;
+
+                    // 【重要】スクロールした分、内部の計算用座標(startYなど)を調整しないと
+                    // 予定ブロックが指からズレていったり、ガタガタ揺れる原因になります
+                    // startY += speed; // 必要に応じてここを調整
+
+                    updateDragDisplay(); // 描画更新
+                }, 20);
+            }
+
+            function stopAutoScroll() {
+                if (scrollInterval) {
+                    clearInterval(scrollInterval);
+                    scrollInterval = null;
+                    currentScrollSpeed = 0;
+                }
+            }
+
+            function startDrag(e, mode, taskId = null) {
+                stopAutoScroll();
+                isDragging = true;
+                dragMode = mode;
+                activeTaskId = taskId;
+
+                // マウス(e.clientY)かタッチ(e.touches[0].clientY)か
+                const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+                lastTouchY = clientY; // ここを追加：現在の座標を記録
+
+                const container = document.getElementById('timeline-container');
+                const rect = container.getBoundingClientRect();
+                startY = clientY - rect.top + container.scrollTop;
+
+                document.body.style.overflow = 'hidden';
+                if (mode === 'create') {
+                    startIdx = Math.floor(y / 20); // startIdxを更新
+                    updateGuide(startIdx, startIdx);
+                }
+            }
+
+
+            // --- ドラッグ終了時の処理（ここを丸ごと差し替え） ---
+            const stopDrag = () => {
+                // 1. まず何よりも先にスクロールを止める
+                stopAutoScroll();
+                document.body.style.overflow = '';
+                // ドラッグ中でなければ終了
+                if (!isDragging) return;
+
+                // 2. 衝突判定用の関数を定義（外にない場合の保険）
+                const tasks = appData.tasks[selectedDate] || [];
+                const internalCheckCollision = (start, length, id) => {
+                    return tasks.some(other => {
+                        if (other.id === id) return false;
+                        const otherEnd = other.start + other.length;
+                        const currentEnd = start + length;
+                        return start < otherEnd && currentEnd > other.start;
+                    });
+                };
+
+                const currentMode = dragMode;
+                const currentTaskId = activeTaskId;
+                const pre = document.querySelector('.move-preview');
+
+                try {
+                    // --- A. 移動・リサイズの確定 ---
+                    if (currentTaskId && (currentMode === 'move' || currentMode.startsWith('resize')) && pre) {
+                        let nextStart = parseInt(pre.dataset.ns);
+                        let nextLength = parseInt(pre.dataset.nl);
+
+                        if (!internalCheckCollision(nextStart, nextLength, currentTaskId)) {
+                            const t = tasks.find(x => x.id === currentTaskId);
+                            if (t) {
+                                t.start = nextStart;
+                                t.length = nextLength;
+                                saveData();
+                            }
+                        }
+                    }
+                    // --- B. 新規作成の確定 ---
+                    else if (currentMode === 'create') {
+                        const g = document.getElementById('drag-guide');
+                        if (g && !g.classList.contains('hidden')) {
+                            const top = parseInt(g.style.top) || 0;
+                            const height = parseInt(g.style.height) || 0;
+                            const nStart = Math.round(top / 20);
+                            const nLength = Math.round(height / 20);
+
+                            if (nLength > 0 && !internalCheckCollision(nStart, nLength, null)) {
+                                tempRange = { start: nStart, length: nLength };
+                                document.getElementById('task-name').value = "";
+                                document.getElementById('modal-overlay').style.display = 'flex';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("確定処理中にエラーが発生しました:", e);
+                }
+
+                // 3. 【最重要】何があってもドラッグ状態を解除する
+                isDragging = false;
+                dragMode = null;
+                activeTaskId = null;
+
+                // プレビュー類を消す
+                document.querySelectorAll('.move-preview').forEach(x => x.remove());
+                const guide = document.getElementById('drag-guide');
+                if (guide) guide.classList.add('hidden');
+
+                // 再描画
+                renderTimeline();
+            };
+
+            function updateGuide(min, max) {
+                const guide = document.getElementById('drag-guide');
+                guide.classList.remove('hidden');
+                // 開始位置(min) × 20px
+                guide.style.top = `${min * 20}px`;
+                // (終了-開始+1) × 20px
+                guide.style.height = `${(max - min + 1) * 20}px`;
+
+                const totalMinutes = (max - min + 1) * 15;
+                const h = Math.floor(totalMinutes / 60);
+                const m = totalMinutes % 60;
+                guide.textContent = h > 0 ? `${h}時間${m}分` : `${m}分`;
+            }
+
+            function updateJobArea() {
+                const area = document.getElementById('day-jobs-area');
+                if (!area) return;
+                area.innerHTML = "";
+
+                (appData.longTermJobs || []).filter(j => isJobVisibleOnDate(j, selectedDate)).forEach(j => {
+                    const div = document.createElement('div');
+                    // 進捗が100%なら completed クラスを自動でつけるなどの工夫も可能です
+                    div.className = `job-card ${j.isCompleted ? 'completed' : ''} ${j.isDeleted ? 'deleted' : ''}`;
+
+                    div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <b style="font-size:14px;">${j.name}</b>
+                <small style="color:#666;">想定:${j.totalH}h</small>
+            </div>
+            
+            <div style="background:#fff; padding:8px; border-radius:6px; border:1px solid #eee; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:11px; color:#888;">進捗状況</span>
+                    <span id="prog-val-${j.id}" style="font-size:13px; font-weight:bold; color:#4caf50;">${j.progress}%</span>
+                </div>
+                <input type="range" 
+                       style="width:100%; height:6px; cursor:pointer; accent-color:#4caf50;" 
+                       value="${j.progress}" 
+                       min="0" max="100"
+                       ${j.isDeleted || j.isCompleted ? 'disabled' : ''}
+                       // updateJobArea 内の input range 部分の修正
+oninput="
+    const val = parseInt(this.value);
+    const disp = document.getElementById('prog-val-${j.id}');
+    disp.textContent = val + '%';
+    
+    // 100%ならゴールド、それ以外は緑
+    if(val === 100) {
+        disp.textContent = 'COMPLETE! ✨';
+        disp.style.color = '#d4af37';
+        this.style.accentColor = '#ffd700'; // つまみの色も金に！
+    } else {
+        disp.style.color = '#4caf50';
+        this.style.accentColor = '#4caf50';
+    }
+"
+                       onchange="updateProgress(${j.id}, this.value)">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:5px;">
+                <button class="mini-btn" onclick="openJobModal(${j.id})">編集</button>
+                <button class="mini-btn" onclick="deleteJob(${j.id})">${j.isDeleted ? '復元' : '削除'}</button>
+                <button class="mini-btn" onclick="completeJob(${j.id})">${j.isCompleted ? '戻す' : '完了'}</button>
+            </div>
+        `;
+                    area.appendChild(div);
+                });
+            }
+
+            function updateProgress(id, v) {
+                let val = Math.max(0, Math.min(100, parseInt(v) || 0));
+                appData.longTermJobs.find(x => x.id === id).progress = val;
+                const targetId = Number(id);
+                const progress = Number(val); // 数値に変換
+                const job = appData.longTermJobs.find(j => j.id === targetId);
+                if (job) {
+                    const isNowCompleted = (job.progress < 100 && progress === 100);
+                    job.progress = progress;
+                    job.isCompleted = (progress === 100);
+
+                    if (isNowCompleted) {
+                        // ★ 紙吹雪を発射！（控えめバージョン）
+                        confetti({
+                            particleCount: 150,
+                            angle: 60,
+                            spread: 70,
+                            origin: { x: 0, y: 0.8 }, // 左下から
+                            colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
+                        });
+
+                        // ★ 派手な紙吹雪：右から打ち上げ！
+                        confetti({
+                            particleCount: 150,
+                            angle: 120,
+                            spread: 70,
+                            origin: { x: 1, y: 0.8 }, // 右下から
+                            colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
+                        });
+
+                        // おまけ：中央から少し遅れてパラパラ降らせる
+                        setTimeout(() => {
+                            confetti({
+                                particleCount: 50,
+                                spread: 100,
+                                origin: { y: 0.3 }, // 上から
+                                gravity: 0.5 // ゆっくり降る
+                            });
+                        }, 200);
+                        // スマホなら軽くトントンと振動
+                        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                        setTimeout(() => {
+                            openJobList(); // 案件一覧にいる場合
+                            updateJobArea(); // タイムラインにいる場合
+                        }, 1000); // 紙吹雪を見届けてから 1秒後に移動
+                    }
+                    saveData();
+                    const disp = document.getElementById(`prog-val-${id}`);
+                    if (disp) disp.textContent = progress === 100 ? "完了！✨" : progress + "%";
+                    saveDataAndRefresh();
+                    renderCalendar();
+                }
+            }
+
+
+            function completeJob(id) {
+                const job = appData.longTermJobs.find(j => j.id === id);
+                if (!job) return;
+
+                job.isCompleted = !job.isCompleted;
+
+                // 完了した日の日付を記録する
+                if (job.isCompleted) {
+                    job.completedDate = selectedDate;
+                } else {
+                    delete job.completedDate;
+                }
+
+                saveData();
+                updateJobArea();
+                updateFreeTime();
+                renderCalendar();
+                renderTimeline();
+            }
+
+
+            function deleteJob(id) {
+                const job = appData.longTermJobs.find(j => j.id === id);
+                if (!job) return;
+
+                job.isDeleted = !job.isDeleted;
+
+                // 削除した日の日付を記録する（復活させたときは消す）
+                if (job.isDeleted) {
+                    job.deletedDate = selectedDate;
+                } else {
+                    delete job.deletedDate;
+                }
+
+                saveData();
+                updateJobArea();
+                updateFreeTime();
+                renderCalendar();
+                renderTimeline();
+            }
+
+            function openSleepModal() {
+                const s = (selectedDate && appData.singleSleeps[selectedDate]) ? appData.singleSleeps[selectedDate] : appData.defSleep; document.getElementById('sleep-start').value = indexToTime(s.start); // モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none'); document.getElementById('sleep-end').value = indexToTime(s.end); document.getElementById('batch-sleep-area').className = selectedDate ? 'hidden' : ''; document.getElementById('save-day-sleep-btn').className = selectedDate ? 'save-btn' : 'hidden'; document.getElementById('sleep-modal-overlay').style.display = 'flex';
+                const remote = document.getElementById('scroll-remote-control');
+                if (remote) {
+                    remote.style.display = 'none';
+                }
+                toggleTimelineUI(false);
+
+            }
+            function openShiftModal() {
+                const s = (selectedDate && appData.singleShifts[selectedDate]) ? appData.singleShifts[selectedDate] : appData.defShift; document.getElementById('set-shift-start').value = indexToTime(s.start); document.getElementById('set-shift-end').value = indexToTime(s.end); document.getElementById('batch-shift-area').className = selectedDate ? 'hidden' : ''; document.getElementById('save-day-shift-btn').className = selectedDate ? 'save-btn' : 'hidden'; // モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none'); document.getElementById('shift-modal-overlay').style.display = 'flex';
+                const remote = document.getElementById('scroll-remote-control');
+                if (remote) {
+                    remote.style.display = 'none';
+                }
+                toggleTimelineUI(false);
+            }
+
+            function openJumpModal() { toggleTimelineUI(false); const ys = document.getElementById('jump-year'), ms = document.getElementById('jump-month'); ys.innerHTML = ""; ms.innerHTML = ""; const curY = new Date().getFullYear(); for (let y = curY - 1; y <= curY + 3; y++) ys.innerHTML += `<option value="${y}" ${y == currentViewDate.getFullYear() ? 'selected' : ''}>${y}年</option>`; for (let m = 0; m < 12; m++) ms.innerHTML += `<option value="${m}" ${m == currentViewDate.getMonth() ? 'selected' : ''}>${m + 1}月</option>`; document.getElementById('jump-modal-overlay').style.display = 'flex'; }
+            function jumpToMonth() {
+                currentViewDate.setFullYear(document.getElementById('jump-year').value); currentViewDate.setMonth(document.getElementById('jump-month').value); renderCalendar(); closeModal('jump-modal-overlay');// モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+            }
+            function closeModal(id) {
+                const target = document.getElementById(id);
+                if (target) {
+                    target.style.display = 'none';
+                }
+
+                // タイムライン画面（day-screen）が表示されている時だけ、矢印を再表示させる
+                const isDayScreenVisible = !document.getElementById('day-screen').classList.contains('hidden');
+
+                if (isDayScreenVisible) {
+                    document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'flex');
+                }
+            }
+            function checkConflict(s, l, id, shift, sleep) {
+                if (!sleep) sleep = appData.defSleep;
+                if (!shift) shift = appData.defShift;
+
+                // 睡眠との重なりチェック
+                const isSleep = (sleep.start < sleep.end)
+                    ? (s < sleep.end && s + l > sleep.start)
+                    : (s + l > sleep.start || s < sleep.end);
+                if (isSleep) return true;
+
+                // シフト（仕事）との重なりチェック
+                const breakS = timeToIndex(shift.breakStart || "12:00");
+                const breakE = timeToIndex(shift.breakEnd || "13:00");
+
+                for (let i = s; i < s + l; i++) {
+                    const isWorkHour = (i >= shift.start && i < shift.end);
+                    const isBreakHour = (i >= breakS && i < breakE);
+                    // 仕事中かつ休憩じゃない時間はダメ
+                    if (isWorkHour && !isBreakHour) return true;
+                }
+
+                // 他の予定との重なりチェック
+                return (appData.tasks[selectedDate] || []).some(t => {
+                    if (t.id === id) return false;
+                    // 完全に重なっている場合のみNGとする（s+lがt.startと同じならOK）
+                    return s < t.start + t.length && s + l > t.start;
+                });
+
+
+
+                // マウスを離した時（PC）
+                document.addEventListener('mouseup', handleEnd);
+
+                // 指が離れた時（スマホ）
+                // touchcancelは、操作中にアラームが鳴ったり画面が切り替わったりした時のための「中断」処理です
+                document.addEventListener('touchend', handleEnd, { passive: false });
+                document.addEventListener('touchcancel', handleEnd, { passive: false });
+
+            }
+
+            // 指を離したとき（mouseup / touchend）に呼ぶ共通処理
+            function handleEnd() {
+                clearTimeout(touchTimer); // これが大事
+                if (!isDragging) return;
+
+                if (dragMode === 'create') {
+                    const guide = document.getElementById('drag-guide');
+                    if (!guide.classList.contains('hidden')) {
+                        // ガイドが表示されている範囲をそのまま予定にする
+                        // ガイドの top / height から逆算するのが最も確実です
+                        const top = parseInt(guide.style.top);
+                        const height = parseInt(guide.style.height);
+
+                        tempRange = {
+                            start: Math.round(top / 20),
+                            length: Math.round(height / 20)
+                        };
+
+                        // 入力ポップアップを表示
+                        document.getElementById('task-name').value = "";
+                        document.getElementById('modal-overlay').style.display = 'flex';
+                        document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+                        const remote = document.getElementById('scroll-remote-control');
+                        if (remote) {
+                            remote.style.display = 'none';
+                        }
+                    }
+                } else if (dragMode === 'move') {
+                    const pre = document.querySelector('.move-preview');
+                    if (pre) {
+                        const ns = parseInt(pre.dataset.ns);
+                        const t = appData.tasks[selectedDate].find(x => x.id === activeTaskId);
+                        if (t) {
+                            t.start = ns;
+                            saveData();
+                            renderTimeline();
+                        }
+                    }
+                }
+
+                // 4. 後片付け
+                isDragging = false;
+                isDraggingTask = false; // ★追記：ガード解除
+                longPressed = false;
+                stopAutoScroll();
+
+                activeTaskId = null;
+                document.getElementById('drag-guide').classList.add('hidden');
+                document.querySelectorAll('.move-preview').forEach(x => x.remove());
+            }
+
+
+
+            function updateFreeTime() {
+                const shift = appData.singleShifts[selectedDate],
+                    sleep = appData.singleSleeps[selectedDate] || appData.defSleep;
+
+                let busyIdx = 0;
+                let busySlots = new Array(96).fill(false);
+
+                for (let i = 0; i < 96; i++) {
+                    // 1. 睡眠判定
+                    const isSleep = (sleep.start < sleep.end)
+                        ? (i >= sleep.start && i < sleep.end)
+                        : (i >= sleep.start || i < sleep.end);
+
+                    let isWorkRelated = false;
+                    if (shift) {
+                        // シフト設定から各値を取得（保存されているプロパティ名に合わせて調整してください）
+                        // 1コマ15分なので、分を15で割ってコマ数に変換
+                        const commuteSlots = Math.ceil((shift.commuteM || 0) / 15) + ((shift.commuteH || 0) * 4);
+
+                        // 勤務本体
+                        const isShiftBody = (i >= shift.start && i < shift.end);
+                        // 通勤（往路：開始前、復路：終了後）
+                        const isCommute = (i >= shift.start - commuteSlots && i < shift.start) ||
+                            (i >= shift.end && i < shift.end + commuteSlots);
+                        // 昼休み（設定された開始・終了インデックスを使用）
+                        const isBreak = (shift.breakStart !== undefined && i >= shift.breakStart && i < shift.breakEnd);
+
+                        if (isShiftBody || isCommute || isBreak) isWorkRelated = true;
+
+                    }
+
+                    if (isSleep || isWorkRelated) {
+                        busyIdx++;
+                        busySlots[i] = true;
+                    }
+                }
+
+                // 2. 予定ブロック（tasks）の重なりチェック
+                (appData.tasks[selectedDate] || []).forEach(t => {
+                    for (let i = t.start; i < t.start + t.length; i++) {
+                        if (!busySlots[i]) {
+                            busyIdx++;
+                            busySlots[i] = true;
+                        }
+                    }
+                });
+
+                let jobH = 0;
+                (appData.longTermJobs || [])
+                    .filter(j => isJobVisibleOnDate(j, selectedDate))
+                    .filter(j => !j.isDeleted && !j.isCompleted) // ★ここを追加！削除済と完了済を除外
+                    .forEach(j => {
+                        const totalDays = Math.max(1, (new Date(j.end) - new Date(j.start)) / 86400000 + 1);
+                        jobH += (j.totalH * (1 - j.progress / 100)) / Math.max(1, totalDays);
+                    });
+
+                const freeMin = (96 - busyIdx) * 15 - (jobH * 60);
+                const fEl = document.getElementById('freeTime');
+                if (fEl) {
+                    fEl.innerHTML = `自由時間: ${Math.floor(Math.max(0, freeMin) / 60)}時間 ${Math.floor(Math.max(0, freeMin) % 60)}分<br><small>案件ノルマ: 約 ${jobH.toFixed(1)}時間/日</small>`;
+                }
+            }
+
+
+
+            function saveDataAndRefresh() { saveData(); if (selectedDate) { updateJobArea(); renderTimeline(); } else renderCalendar(); updateFreeTime(); }
+
+
+
+
+            function showDay(d) {
+                selectedDate = d;
+
+                // --- 日付の表示形式を変換 ---
+                const dateObj = new Date(d);
+                const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
+                const dayName = weekDays[dateObj.getDay()]; // 曜日を取得
+
+                // 「2026年2月18日 (水)」という形式を作成
+                const formattedDate = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日 (${dayName})`;
+
+                // ラベルに反映
+                document.getElementById('current-day-label').textContent = formattedDate;
+
+                // --- 画面の表示切り替え ---
+                document.getElementById('calendar-screen').classList.add('hidden');
+                document.getElementById('day-screen').classList.remove('hidden');
+                document.getElementById('back-to-cal-btn').classList.remove('hidden');
+                document.querySelector('.month-nav').classList.add('hidden');
+                document.getElementById('month-reset-btn').classList.add('hidden');
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'flex');
+                document.getElementById('mode-selector').classList.add('hidden');
+
+                renderTimeline();
+                updateJobArea();
+            }
+
+            function setAppMode(m) { inputMode = m; document.getElementById('mode-normal-btn').className = 'mode-btn' + (m === 'normal' ? ' active' : ''); document.getElementById('mode-shift-btn').className = 'mode-btn' + (m === 'shift' ? ' shift-active' : ''); renderCalendar(); }
+
+            function showCalendar() {
+                selectedDate = ""; document.getElementById('calendar-screen').classList.remove('hidden'); document.getElementById('day-screen').classList.add('hidden'); document.getElementById('back-to-cal-btn').classList.add('hidden'); document.getElementById('mode-selector').classList.remove('hidden'); document.querySelector('.month-nav').classList.remove('hidden');
+                document.getElementById('month-reset-btn').classList.remove('hidden'); document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none'); renderCalendar();
+            }
+
+
+            function changeMonth(diff) {
+                currentViewDate.setMonth(currentViewDate.getMonth() + diff);
+                fetchHolidays(); // ここも renderCalendar から fetchHolidays に変更
+            }
+
+            function saveTask() {
+                const name = document.getElementById('task-name').value.trim() || "予定";
+                if (activeTaskId) {
+                    // 編集モード
+                    const task = appData.tasks[selectedDate].find(x => x.id === activeTaskId);
+                    if (task) {
+                        task.name = name;
+                        task.color = selectedColor; // 選択中の色を反映
+                    }
+
+                } else {
+
+                    // 新規作成モード
+                    if (!appData.tasks[selectedDate]) appData.tasks[selectedDate] = [];
+                    appData.tasks[selectedDate].push({
+                        id: Date.now(),
+                        name,
+                        start: tempRange.start,
+                        length: tempRange.length,
+                        color: selectedColor
+
+                    });
+
+                }
+                activeTaskId = null; // IDをリセット
+                document.getElementById('task-name').value = "";
+                saveDataAndRefresh();
+                document.getElementById('modal-overlay').style.display = 'none';
+
+                closeModal('modal-overlay');
+
+            }
+
+
+            function deleteTask() {
+                if (!appData.tasks[selectedDate]) return;
+                appData.tasks[selectedDate] = appData.tasks[selectedDate].filter(x => x.id !== activeTaskId);
+                saveDataAndRefresh();
+                closeModal('edit-modal-overlay');
+            }
+
+            function saveDaySleep() { appData.singleSleeps[selectedDate] = { start: timeToIndex(document.getElementById('sleep-start').value), end: timeToIndex(document.getElementById('sleep-end').value) }; saveDataAndRefresh(); closeModal('sleep-modal-overlay'); }
+            function saveDefSleep() { appData.defSleep = { start: timeToIndex(document.getElementById('sleep-start').value), end: timeToIndex(document.getElementById('sleep-end').value) }; saveData(); alert("基本設定を保存しました"); }
+
+
+            function saveDayShift() {
+                appData.singleShifts[selectedDate] = {
+                    start: timeToIndex(document.getElementById('set-shift-start').value),
+                    end: timeToIndex(document.getElementById('set-shift-end').value),
+                    commuteH: parseInt(document.getElementById('set-commute-h').value) || 0,
+                    commuteM: parseInt(document.getElementById('set-commute-m').value) || 0,
+                    breakStart: document.getElementById('set-break-start').value,
+                    breakEnd: document.getElementById('set-break-end').value
+                };
+                saveDataAndRefresh();
+                closeModal('shift-modal-overlay');
+            }
+
+            function saveDefShift() {
+                appData.defShift = {
+                    start: timeToIndex(document.getElementById('set-shift-start').value),
+                    end: timeToIndex(document.getElementById('set-shift-end').value),
+                    commuteH: parseInt(document.getElementById('set-commute-h').value) || 0,
+                    commuteM: parseInt(document.getElementById('set-commute-m').value) || 0,
+                    breakStart: document.getElementById('set-break-start').value,
+                    breakEnd: document.getElementById('set-break-end').value
+                };
+                saveData();
+                alert("基本設定を保存しました");
+            }
+
+
+            // 日付を前後させる関数
+            function slideDay(diff) {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() + diff);
+                showDay(dtToStr(d));
+            }
+
+            // シフトの一括反映
+            function applyBatchShift() {
+                const checked = Array.from(document.querySelectorAll('#weekday-checks input:checked')).map(c => parseInt(c.value));
+                const y = currentViewDate.getFullYear(), m = currentViewDate.getMonth(), last = new Date(y, m + 1, 0).getDate();
+                checked.forEach(w => {
+                    for (let i = 1; i <= last; i++) {
+                        const d = new Date(y, m, i);
+                        if (d.getDay() === w) {
+                            appData.singleShifts[dtToStr(d)] = JSON.parse(JSON.stringify(appData.defShift));
+                        }
+                    }
+                });
+                saveData();
+                renderCalendar();
+                closeModal('shift-modal-overlay');
+            }
+
+            // 祝日データの取得
+            async function fetchHolidays() {
+                const year = currentViewDate.getFullYear();
+                try {
+                    const response = await fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    holidayData = await response.json();
+                } catch (e) {
+                    console.error("祝日の取得に失敗しました", e);
+                    holidayData = {};
+                } finally {
+                    renderCalendar();
+                }
+            }
+
+            // 案件一覧を開く
+            function openJobList() {
+                const container = document.getElementById('all-job-list-container');
+                container.innerHTML = "";
+                const sortedJobs = [...appData.longTermJobs].sort((a, b) => {
+                    // 1. まず削除済みを一番下に
+                    if (a.isDeleted !== b.isDeleted) return a.isDeleted ? 1 : -1;
+                    // 2. 次に完了済みを下に
+                    if (a.isCompleted !== b.isCompleted) return a.isCompleted ? 1 : -1;
+                    // 3. 残りはID（作成順）などで並べる
+                    return b.id - a.id;
+                });
+
+                sortedJobs.forEach(job => {
+                    const div = document.createElement('div');
+                    div.className = `job-card ${job.isCompleted ? 'completed' : ''} ${job.isDeleted ? 'deleted' : ''}`;
+                    div.style.marginBottom = "10px";
+                    div.style.padding = "10px";
+                    div.style.border = "1px solid #ddd";
+                    div.style.borderRadius = "8px";
+
+                    // openJobList 関数の中の HTML 生成部分を修正
+                    div.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="font-weight:bold; font-size:15px; color:#333;">${job.name}</div>
+        <div>
+            <button class="mini-btn" onclick="openJobModal(${job.id})" style="padding:6px 10px; margin-right:5px; border-radius:5px;">✏️</button>
+            <button class="mini-btn" onclick="hardDeleteJob(${job.id})" style="padding:6px 10px; background:#ffebee; color:#c62828; border-radius:5px;">×</button>
+        </div>
+    </div>
+    
+    <div style="width:100%; height:12px; background:#eee; border-radius:6px; margin-top:10px; overflow:hidden; position:relative;">
+        <div style="width:${job.progress}%; height:100%; background:linear-gradient(90deg, #81c784, #4caf50); transition: width 0.5s ease-in-out;"></div>
+    </div>
+    
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:#666; margin-top:5px;">
+        <span>想定: ${job.totalH}h</span>
+        <span style="font-weight:bold; color:#2e7d32;">${job.progress}% 完了</span>
+    </div>
+    <div style="font-size:11px; color:#999;">期間: ${job.start} ～ ${job.end}</div>
+`;
+                    container.appendChild(div);
+                });
+                // モーダルを開く処理のどこかに1行追加
+                document.querySelectorAll('.side-nav').forEach(el => el.style.display = 'none');
+                document.getElementById('job-list-modal-overlay').style.display = 'flex';
+            }
+
+            // 履歴から完全に削除
+            function hardDeleteJob(id) {
+                toggleTimelineUI(false);
+                const targetId = Number(id);
+                // 削除対象の案件名を特定する
+                const targetJob = appData.longTermJobs.find(j => Number(j.id) === targetId);
+                if (!targetJob) return;
+                const targetName = targetJob.name; // 消すべき名前（例：「A案件」）
+
+                if (confirm(`「${targetName}」を履歴とタイムラインから完全に削除しますか？`)) {
+                    // 1. 案件リストから削除
+                    appData.longTermJobs = appData.longTermJobs.filter(j => Number(j.id) !== targetId);
+
+                    // 2. 全日程の予定を「名前」でスキャンして削除
+                    if (appData.tasks) {
+                        Object.keys(appData.tasks).forEach(date => {
+                            appData.tasks[date] = appData.tasks[date].filter(task => {
+                                // 名前が一致するものを消去（完全に一致しないものだけ残す）
+                                return task.name !== targetName;
+                            });
+                        });
+                    }
+
+                    saveData();
+                    openJobList();
+                    renderCalendar();
+                    renderTimeline();
+                }
+            }
+
+
+            function getUpcomingJobs() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                // 3日後の日付
+                const threeDaysLater = new Date(today);
+                threeDaysLater.setDate(today.getDate() + 3);
+
+                // 条件に合う案件を抽出
+                return (appData.longTermJobs || []).filter(j => {
+                    const dueDate = new Date(j.end);
+                    // 削除・完了されておらず、かつ「今日〜3日後」が締切のもの
+                    return !j.isDeleted && !j.isCompleted && dueDate >= today && dueDate <= threeDaysLater;
+                });
+            }
+
+            function toggleHandedness() {
+                appData.settings.handleSide = (appData.settings.handleSide === 'right') ? 'left' : 'right';
+                saveData();
+                renderTimeline(); // タイムラインを再描画して反映
+            }
+
+            function sendJobNotification() {
+                const now = new Date();
+                // 日本時間の YYYY-MM-DD を確実に取得
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                const todayStr = `${y}-${m}-${d}`; // "2026-02-25" 形式
+
+                const todayTime = new Date(y, now.getMonth(), now.getDate()).getTime();
+                const threeDaysLaterTime = todayTime + (3 * 24 * 60 * 60 * 1000);
+
+                let upcomingJobs = (appData.longTermJobs || []).filter(j => {
+                    // スラッシュをハイフンに置換して統一
+                    const formattedEnd = j.end.replace(/\//g, '-');
+                    const dueDate = new Date(formattedEnd);
+                    const dueTime = dueDate.getTime();
+
+                    return !j.isDeleted && !j.isCompleted && dueTime >= todayTime && dueTime <= threeDaysLaterTime;
+                });
+
+                if (upcomingJobs.length === 0) return;
+
+                upcomingJobs.sort((a, b) => new Date(a.end.replace(/\//g, '-')) - new Date(b.end.replace(/\//g, '-')));
+
+                // 1. メッセージ作成
+                let title = upcomingJobs.length === 1 ? "📢 締切間近の案件" : `📢 締切間近が ${upcomingJobs.length} 件あります`;
+
+                // 2. 各案件の表示スタイルを設定
+                let bodyHtml = upcomingJobs.map(j => {
+                    // 形式を統一して比較
+                    const jobEnd = j.end.replace(/\//g, '-');
+                    const isToday = (jobEnd === todayStr);
+
+                    if (isToday) {
+                        // ★ ここで色と太さを指定
+                        return `<div style="color: #ff4d4d !important; font-weight: 900 !important; margin-bottom: 6px;">・${j.name} (本日締切！)</div>`;
+                    } else {
+                        return `<div style="margin-bottom: 4px; color: #ffffff;">・${j.name} (${j.end})</div>`;
+                    }
+                }).join('');
+
+                // 3. 画面に表示
+                const bar = document.getElementById('app-notice-bar');
+                const titleEl = document.getElementById('notice-title');
+                const bodyEl = document.getElementById('notice-body');
+
+                titleEl.innerText = title;
+                bodyEl.innerHTML = bodyHtml; // innerHTMLを使う
+
+                bar.style.display = 'block';
+                bar.onclick = () => { bar.style.display = 'none'; };
+                setTimeout(() => { bar.style.display = 'none'; }, 10000);
+            }
+
+            // アプリの初期化
+            function init() {
+                loadData();
+                renderCalendar();
+                fetchHolidays();
+
+                // ★ ここから追記：通知の初期設定と実行
+                if (window.Notification) {
+                    if (Notification.permission === "default") {
+                        Notification.requestPermission();
+                    }
+                    // アプリ起動時に締切をチェックして通知を出す
+                    sendJobNotification();
+                }
+                // ★ ここまで追記
+
+                const dayScreen = document.getElementById('day-screen');
+                dayScreen.addEventListener('touchstart', (e) => {
+                    if (document.getElementById('job-list-modal-overlay').style.display === 'flex') return;
+                    touchStartX = e.touches[0].pageX;
+                }, { passive: true });
+
+                dayScreen.addEventListener('touchend', (e) => {
+                    // ★ここを追加：タスク操作中なら日付を切り替えない！
+                    if (isDraggingTask) return;
+                    const touchEndX = e.changedTouches[0].pageX;
+                    const diff = touchStartX - touchEndX;
+                    if (diff > 100) slideDay(1);
+                    else if (diff < -100) slideDay(-1);
+                }, { passive: true });
+
+                document.getElementById('final-delete-btn').onclick = deleteTask;
+                document.getElementById('month-reset-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    const y = currentViewDate.getFullYear(), m = currentViewDate.getMonth() + 1;
+                    document.getElementById('reset-confirm-msg').textContent = `${y}年${m}月の「予定」と「シフト」をすべて削除します。よろしいですか？`;
+                    document.getElementById('reset-modal-overlay').style.display = 'flex';
+                };
+
+                // init関数の中にこれを追加
+                document.body.addEventListener('click', () => {
+                    sendJobNotification();
+                }, { once: true }); // 最初の一回だけ実行
+
+                const cp = document.getElementById('color-picker-area');
+                if (cp) {
+                    cp.innerHTML = "";
+                    COLORS.forEach(c => {
+                        const b = document.createElement('div');
+                        b.style.height = '35px';
+                        b.style.borderRadius = '6px';
+                        b.style.background = c;
+                        b.style.border = '3px solid transparent';
+                        b.onclick = () => {
+                            selectedColor = c;
+                            [...cp.children].forEach(x => x.style.borderColor = 'transparent');
+                            b.style.borderColor = '#333';
+                        };
+                        cp.appendChild(b);
+                    });
+                }
+            }
+
+            // リモコンをセットアップする関数
+            function setupScrollRemote() {
+                // 1. 二重生成防止
+                if (document.getElementById('scroll-remote-control')) return;
+
+                // 2. リモコン要素の作成
+                const remote = document.createElement('div');
+                remote.id = 'scroll-remote-control';
+                remote.innerHTML = `
+        <div class="remote-icon" id="remote-up">▲</div>
+        <div class="remote-text">SCROLL</div>
+        <div class="remote-icon" id="remote-down">▼</div>
+    `;
+                document.body.appendChild(remote);
+
+                // 3. スクロール対象のコンテナ（IDを timeline-container に統一）
+                const container = document.getElementById('timeline-container');
+                let lastY = 0;
+
+                // --- A: スライド操作（リモコンをなぞって動かす） ---
+                remote.addEventListener('touchstart', (e) => {
+                    lastY = e.touches[0].clientY;
+                    remote.style.background = "rgba(0, 0, 0, 0.7)";
+                    if (navigator.vibrate) navigator.vibrate(10);
+                }, { passive: false });
+
+                remote.addEventListener('touchmove', (e) => {
+                    if (!container) return;
+                    const currentY = e.touches[0].clientY;
+                    const diff = lastY - currentY;
+
+                    // 移動量を調整（なぞった分だけスルスル動く）
+                    container.scrollTop += diff * 2.5;
+                    lastY = currentY;
+                    e.preventDefault();
+                }, { passive: false });
+
+                remote.addEventListener('touchend', () => {
+                    remote.style.background = "rgba(0, 0, 0, 0.4)";
+                    stopAutoScroll(); // Bの連打モードも止める
+                });
+
+                // --- B: ボタン操作（▲▼を押し続けて動かす） ---
+                const upBtn = document.getElementById('remote-up');
+                const downBtn = document.getElementById('remote-down');
+
+                if (upBtn && downBtn) {
+                    // 上ボタン
+                    upBtn.addEventListener('touchstart', (e) => {
+                        e.stopPropagation(); // スライド操作と混ざらないように
+                        startAutoScroll(-15);
+                    }, { passive: false });
+
+                    // 下ボタン
+                    downBtn.addEventListener('touchstart', (e) => {
+                        e.stopPropagation();
+                        startAutoScroll(15);
+                    }, { passive: false });
+
+                    // 離したら止める（PC用も含む）
+                    [upBtn, downBtn].forEach(btn => {
+                        btn.addEventListener('touchend', stopAutoScroll);
+                        btn.addEventListener('mousedown', (e) => {
+                            const speed = e.target.id === 'remote-up' ? -15 : 15;
+                            startAutoScroll(speed);
+                        });
+                        btn.addEventListener('mouseup', stopAutoScroll);
+                    });
+                }
+            }
+
+            // init() の最後、または一番下の実行部分に追加してください
+            setupScrollRemote();
+
+
+            // 起動
+            init();
+
+            // PC用マウス監視
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                handleAutoScroll(e.clientY);
+                lastTouchY = e.clientY; // マウスのY座標を更新
+                updateDragDisplay();    // 表示を更新
+            });
+
+            // マウスを離した時
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    stopAutoScroll();
+                    stopDrag();
+                }
+            });
+
+            // スマホ用タッチ監視
+            window.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                lastTouchY = touch.clientY;
+                handleAutoScroll(lastTouchY); // 自動スクロール判定
+                updateDragDisplay();
+            }, { passive: false });
+
+            // --- スマホ用：タッチ終了 ---
+            window.addEventListener('touchend', () => {
+                stopAutoScroll(); // リモコン停止用
+                stopDrag();
+            });
+
+
+            // リモコンボタンの設定関数
+            const setupRemoteBtn = (btn, speed) => {
+                if (!btn) return;
+
+                const startAction = (e) => {
+                    e.preventDefault(); // 👈 これが超重要！ブラウザの標準挙動を殺します
+                    e.stopPropagation(); // 👈 親要素への伝播を止めます
+                    startAutoScroll(speed);
+                };
+
+                // スマホ用
+                btn.addEventListener('touchstart', startAction, { passive: false });
+                btn.addEventListener('touchend', stopAutoScroll, { passive: false });
+
+                // PC用
+                btn.addEventListener('mousedown', startAction);
+                btn.addEventListener('mouseup', stopAutoScroll);
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setupScrollRemote);
+            } else {
+                setupScrollRemote();
+            }
+
+        </script>
+</body>
+
+</html>
