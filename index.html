@@ -1140,7 +1140,7 @@
                 if (menuModal) {
                     menuModal.style.display = 'flex';
                 }
-             
+                openJobList();
                 // 3. 背景のカレンダー表示を更新する
                 renderCalendar();
                 if (typeof updateJobArea === 'function') updateJobArea();
@@ -1730,13 +1730,15 @@
 
                 lastTouchY = event.clientY;
 
-                // 自動スクロール（指が画面の上下端に達した時だけ中身を動かす）
-                // これは予定を「朝の方」や「夜の方」へ長く伸ばしたい時に便利なので残します
-                if (lastTouchY < 100) startAutoScroll(-10);
-                else if (lastTouchY > window.innerHeight - 100) startAutoScroll(10);
-                else stopAutoScroll();
+                const edgeSize = 100;
+                if (lastTouchY < edgeSize) {
+                    startAutoScroll(-10); // 上へ
+                } else if (lastTouchY > window.innerHeight - edgeSize) {
+                    startAutoScroll(10);  // 下へ
+                } else {
+                    stopAutoScroll();     // 中央にいる時は止める
+                }
 
-                // 見た目の更新（予定の影を伸ばしたり動かしたりする）
                 updateDragDisplay();
             }
 
@@ -1833,11 +1835,8 @@
 
                 const isRemoteActive = (dragMode === null && !isDragging); // リモコン操作中か？
 
-                if (dragMode === 'create') {
-                    // 予定作成中は、自動スクロールを強制停止
-                    stopAutoScroll();
-                } else if (isDragging) {
-                    // 移動やリサイズ中も、一旦止めて様子を見るのが安全
+                if (isDragging) {
+                    // 予定作成(create)でも移動(move)でも、端っこに行ったらスクロールを許可する
                     handleAutoScroll(lastTouchY);
                 }
             }
@@ -1946,6 +1945,7 @@
             function startDrag(e, mode, taskId = null) {
                 stopAutoScroll();
                 isDragging = true;
+                isDraggingTask = true;
                 dragMode = mode;
                 activeTaskId = taskId;
 
@@ -1969,6 +1969,7 @@
             const stopDrag = () => {
                 // 1. まず何よりも先にスクロールを止める
                 stopAutoScroll();
+                isDraggingTask = false;
                 document.body.style.overflow = '';
                 // ドラッグ中でなければ終了
                 if (!isDragging) return;
@@ -2051,30 +2052,30 @@
                 guide.textContent = h > 0 ? `${h}時間${m}分` : `${m}分`;
             }
 
-           function updateJobArea() {
-    const area = document.getElementById('day-jobs-area');
-    if (!area) return;
-    area.innerHTML = "";
+            function updateJobArea() {
+                const area = document.getElementById('day-jobs-area');
+                if (!area) return;
+                area.innerHTML = "";
 
-    (appData.longTermJobs || []).filter(j => {
-        // 1. そもそもその日の期間内かチェック
-        const isVisible = isJobVisibleOnDate(j, selectedDate);
-        if (!isVisible) return false;
+                (appData.longTermJobs || []).filter(j => {
+                    // 1. そもそもその日の期間内かチェック
+                    const isVisible = isJobVisibleOnDate(j, selectedDate);
+                    if (!isVisible) return false;
 
-        // 2. 【追加】完了済み案件の翌日以降非表示ルール
-        // 完了済み(isCompleted) かつ 完了した日(completedDate)が記録されている場合
-        if (j.isCompleted && j.completedDate) {
-            // selectedDate(選択中の日) が completedDate(完了した日) よりも後の日付なら非表示
-            if (selectedDate > j.completedDate) {
-                return false;
-            }
-        }
-        return true;
-    }).forEach(j => {
-        const div = document.createElement('div');
-        div.className = `job-card ${j.isCompleted ? 'completed' : ''} ${j.isDeleted ? 'deleted' : ''}`;
+                    // 2. 【追加】完了済み案件の翌日以降非表示ルール
+                    // 完了済み(isCompleted) かつ 完了した日(completedDate)が記録されている場合
+                    if (j.isCompleted && j.completedDate) {
+                        // selectedDate(選択中の日) が completedDate(完了した日) よりも後の日付なら非表示
+                        if (selectedDate > j.completedDate) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }).forEach(j => {
+                    const div = document.createElement('div');
+                    div.className = `job-card ${j.isCompleted ? 'completed' : ''} ${j.isDeleted ? 'deleted' : ''}`;
 
-        div.innerHTML = `
+                    div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <b style="font-size:14px;">${j.name}</b>
                 <small style="color:#666;">想定:${j.totalH}h</small>
@@ -2132,48 +2133,48 @@ oninput="
                     job.isCompleted = (progress === 100);
 
                     if (progress === 100) {
-                 job.complietedDate = selectedDate;                    
+                        job.complietedDate = selectedDate;
 
-                     if (isNowCompleted) {
-                       
-                        // ★ 紙吹雪を発射！（控えめバージョン）
-                        confetti({
-                            particleCount: 150,
-                            angle: 60,
-                            spread: 70,
-                            origin: { x: 0, y: 0.8 }, // 左下から
-                            colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
-                        });
+                        if (isNowCompleted) {
 
-                        // ★ 派手な紙吹雪：右から打ち上げ！
-                        confetti({
-                            particleCount: 150,
-                            angle: 120,
-                            spread: 70,
-                            origin: { x: 1, y: 0.8 }, // 右下から
-                            colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
-                        });
-
-                        // おまけ：中央から少し遅れてパラパラ降らせる
-                        setTimeout(() => {
+                            // ★ 紙吹雪を発射！（控えめバージョン）
                             confetti({
-                                particleCount: 50,
-                                spread: 100,
-                                origin: { y: 0.3 }, // 上から
-                                gravity: 0.5 // ゆっくり降る
+                                particleCount: 150,
+                                angle: 60,
+                                spread: 70,
+                                origin: { x: 0, y: 0.8 }, // 左下から
+                                colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
                             });
-                        }, 200);
-                        // スマホなら軽くトントンと振動
-                        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
-                        setTimeout(() => {
-                            openJobList(); // 案件一覧にいる場合
-                            updateJobArea(); // タイムラインにいる場合
-                        }, 1000); // 紙吹雪を見届けてから 1秒後に移動
-                    }
 
-} else {
-job.completedDate = null;
-        }
+                            // ★ 派手な紙吹雪：右から打ち上げ！
+                            confetti({
+                                particleCount: 150,
+                                angle: 120,
+                                spread: 70,
+                                origin: { x: 1, y: 0.8 }, // 右下から
+                                colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
+                            });
+
+                            // おまけ：中央から少し遅れてパラパラ降らせる
+                            setTimeout(() => {
+                                confetti({
+                                    particleCount: 50,
+                                    spread: 100,
+                                    origin: { y: 0.3 }, // 上から
+                                    gravity: 0.5 // ゆっくり降る
+                                });
+                            }, 200);
+                            // スマホなら軽くトントンと振動
+                            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                            setTimeout(() => {
+                                openJobList(); // 案件一覧にいる場合
+                                updateJobArea(); // タイムラインにいる場合
+                            }, 1000); // 紙吹雪を見届けてから 1秒後に移動
+                        }
+
+                    } else {
+                        job.completedDate = null;
+                    }
                     saveData();
 
                     const disp = document.getElementById(`prog-val-${id}`);
@@ -2934,5 +2935,3 @@ job.completedDate = null;
 </body>
 
 </html>
-
-
