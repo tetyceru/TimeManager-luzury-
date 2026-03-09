@@ -2175,10 +2175,6 @@ oninput="
 job.completedDate = null;
         }
                     saveData();
-setTimeout(() => {
-            updateJobArea();
-            if (typeof openJobList === 'function') openJobList();
-        }, 1200);
 
                     const disp = document.getElementById(`prog-val-${id}`);
                     if (disp) disp.textContent = progress === 100 ? "完了！✨" : progress + "%";
@@ -2938,3 +2934,4 @@ setTimeout(() => {
 </body>
 
 </html>
+
