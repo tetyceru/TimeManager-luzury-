@@ -1144,6 +1144,7 @@
                 // 3. 背景のカレンダー表示を更新する
                 renderCalendar();
                 if (typeof updateJobArea === 'function') updateJobArea();
+                updateJobArea();
             }
 
             function dtToStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -2050,17 +2051,30 @@
                 guide.textContent = h > 0 ? `${h}時間${m}分` : `${m}分`;
             }
 
-            function updateJobArea() {
-                const area = document.getElementById('day-jobs-area');
-                if (!area) return;
-                area.innerHTML = "";
+           function updateJobArea() {
+    const area = document.getElementById('day-jobs-area');
+    if (!area) return;
+    area.innerHTML = "";
 
-                (appData.longTermJobs || []).filter(j => isJobVisibleOnDate(j, selectedDate)).forEach(j => {
-                    const div = document.createElement('div');
-                    // 進捗が100%なら completed クラスを自動でつけるなどの工夫も可能です
-                    div.className = `job-card ${j.isCompleted ? 'completed' : ''} ${j.isDeleted ? 'deleted' : ''}`;
+    (appData.longTermJobs || []).filter(j => {
+        // 1. そもそもその日の期間内かチェック
+        const isVisible = isJobVisibleOnDate(j, selectedDate);
+        if (!isVisible) return false;
 
-                    div.innerHTML = `
+        // 2. 【追加】完了済み案件の翌日以降非表示ルール
+        // 完了済み(isCompleted) かつ 完了した日(completedDate)が記録されている場合
+        if (j.isCompleted && j.completedDate) {
+            // selectedDate(選択中の日) が completedDate(完了した日) よりも後の日付なら非表示
+            if (selectedDate > j.completedDate) {
+                return false;
+            }
+        }
+        return true;
+    }).forEach(j => {
+        const div = document.createElement('div');
+        div.className = `job-card ${j.isCompleted ? 'completed' : ''} ${j.isDeleted ? 'deleted' : ''}`;
+
+        div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <b style="font-size:14px;">${j.name}</b>
                 <small style="color:#666;">想定:${j.totalH}h</small>
@@ -2081,7 +2095,8 @@ oninput="
     const val = parseInt(this.value);
     const disp = document.getElementById('prog-val-${j.id}');
     disp.textContent = val + '%';
-    
+    const jobId = document.getElementById('edit-job-id').value;
+           const timelineVal = document.getElementById('prog-val-' + jobId);
     // 100%ならゴールド、それ以外は緑
     if(val === 100) {
         disp.textContent = 'COMPLETE! ✨';
@@ -2116,7 +2131,11 @@ oninput="
                     job.progress = progress;
                     job.isCompleted = (progress === 100);
 
-                    if (isNowCompleted) {
+                    if (progress === 100) {
+                 job.complietedDate = selectedDate;                    
+
+                     if (isNowCompleted) {
+                       
                         // ★ 紙吹雪を発射！（控えめバージョン）
                         confetti({
                             particleCount: 150,
@@ -2151,7 +2170,16 @@ oninput="
                             updateJobArea(); // タイムラインにいる場合
                         }, 1000); // 紙吹雪を見届けてから 1秒後に移動
                     }
+
+} else {
+job.completedDate = null;
+        }
                     saveData();
+setTimeout(() => {
+            updateJobArea();
+            if (typeof openJobList === 'function') openJobList();
+        }, 1200);
+
                     const disp = document.getElementById(`prog-val-${id}`);
                     if (disp) disp.textContent = progress === 100 ? "完了！✨" : progress + "%";
                     saveDataAndRefresh();
