@@ -1100,6 +1100,7 @@
                 const end = document.getElementById('job-end').value;
                 const totalH = parseFloat(document.getElementById('job-total-h').value) || 0;
                 const memo = document.getElementById('job-memo').value;
+
                 toggleTimelineUI(false);
 
 
@@ -1124,7 +1125,7 @@
                         end: end,
                         totalH: totalH,
                         memo: memo,
-                        progress: 0,
+
                         isCompleted: false
                     };
                     appData.longTermJobs.push(newJob);
@@ -1335,6 +1336,8 @@
             function openJobModal(id = null) {
                 const listModal = document.getElementById('job-list-modal-overlay');
                 isEditingFromList = (listModal && listModal.style.display === 'flex');
+                const progInput = document.getElementById('job-progress');
+                const progDisp = document.getElementById('job-progress-display');
                 closeModal('job-list-modal-overlay');
                 toggleTimelineUI(false);
 
@@ -1348,6 +1351,8 @@
                         document.getElementById('job-total-h').value = j.totalH;
                         document.getElementById('job-memo').value = j.memo || ""; // メモを読み込み
                         document.getElementById('job-progress').value = j.progress || 0;
+                        progInput.value = j.progress || 0;
+                        progDisp.textContent = (j.progress || 0) + '%';
                         document.getElementById('job-progress-display').textContent = (j.progress || 0) + "%";
                     }
                 } else {
@@ -2163,7 +2168,7 @@ oninput="
 
                             // 1秒後にリストを整理
                             setTimeout(() => {
-                               
+                                openJobList();
                                 updateJobArea();
                             }, 1000);
                         }
@@ -2204,7 +2209,8 @@ oninput="
                 updateFreeTime();
                 renderCalendar();
                 renderTimeline();
-                
+                // 案件一覧も開いていれば更新
+                if (typeof openJobList === 'function') openJobList();
             }
 
 
@@ -2941,5 +2947,3 @@ oninput="
 </body>
 
 </html>
-
-
