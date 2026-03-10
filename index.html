@@ -1141,7 +1141,7 @@
                 if (menuModal) {
                     menuModal.style.display = 'flex';
                 }
-                
+
                 // 3. 背景のカレンダー表示を更新する
                 renderCalendar();
                 if (typeof updateJobArea === 'function') updateJobArea();
@@ -2088,6 +2088,8 @@
                     <span id="prog-val-${j.id}" style="font-size:13px; font-weight:bold; color:#4caf50;">${j.progress}%</span>
                 </div>
                 <input type="range" 
+                ontouchstart="event.stopPropagation()"
+onmousedown="event.stopPropagation()"
                        style="width:100%; height:6px; cursor:pointer; accent-color:#4caf50;" 
                        value="${j.progress}" 
                        min="0" max="100"
@@ -2123,68 +2125,65 @@ oninput="
             }
 
             function updateProgress(id, v) {
-                let val = Math.max(0, Math.min(100, parseInt(v) || 0));
-                appData.longTermJobs.find(x => x.id === id).progress = val;
                 const targetId = Number(id);
-                const progress = Number(val); // 数値に変換
+                const progress = Math.max(0, Math.min(100, parseInt(v) || 0));
                 const job = appData.longTermJobs.find(j => j.id === targetId);
+
                 if (job) {
-                    const isNowCompleted = (job.progress < 100 && progress === 100);
+                    // 前の進捗を覚えておく（100%になった瞬間を判定するため）
+                    const wasCompleted = job.isCompleted;
+
+                    // データの更新
                     job.progress = progress;
                     job.isCompleted = (progress === 100);
 
-                    if (progress === 100) {
-                        job.complietedDate = selectedDate;
+                    if (job.isCompleted) {
+                        job.completedDate = selectedDate; // スペル修正
 
-                        if (isNowCompleted) {
-
-                            // ★ 紙吹雪を発射！（控えめバージョン）
+                        // 今、初めて100%になった時だけ紙吹雪を出す
+                        if (!wasCompleted) {
+                            // 左から
                             confetti({
-                                particleCount: 150,
-                                angle: 60,
-                                spread: 70,
-                                origin: { x: 0, y: 0.8 }, // 左下から
+                                particleCount: 150, angle: 60, spread: 70,
+                                origin: { x: 0, y: 0.8 },
                                 colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
                             });
-
-                            // ★ 派手な紙吹雪：右から打ち上げ！
+                            // 右から
                             confetti({
-                                particleCount: 150,
-                                angle: 120,
-                                spread: 70,
-                                origin: { x: 1, y: 0.8 }, // 右下から
+                                particleCount: 150, angle: 120, spread: 70,
+                                origin: { x: 1, y: 0.8 },
                                 colors: ['#4caf50', '#81c784', '#ffeb3b', '#ffffff', '#ffd700']
                             });
-
-                            // おまけ：中央から少し遅れてパラパラ降らせる
+                            // 中央から
                             setTimeout(() => {
-                                confetti({
-                                    particleCount: 50,
-                                    spread: 100,
-                                    origin: { y: 0.3 }, // 上から
-                                    gravity: 0.5 // ゆっくり降る
-                                });
+                                confetti({ particleCount: 50, spread: 100, origin: { y: 0.3 }, gravity: 0.5 });
                             }, 200);
-                            // スマホなら軽くトントンと振動
-                            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
-                            setTimeout(() => {
-                                openJobList(); // 案件一覧にいる場合
-                                updateJobArea(); // タイムラインにいる場合
-                            }, 1000); // 紙吹雪を見届けてから 1秒後に移動
-                        }
 
+                            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+
+                            // 1秒後にリストを整理
+                            setTimeout(() => {
+                                openJobList();
+                                updateJobArea();
+                            }, 1000);
+                        }
                     } else {
+                        // 100%未満なら完了フラグと日付を消す
                         job.completedDate = null;
                     }
+
                     saveData();
 
+                    // 表示の更新（ここが0%にならないように守る）
                     const disp = document.getElementById(`prog-val-${id}`);
-                    if (disp) disp.textContent = progress === 100 ? "完了！✨" : progress + "%";
+                    if (disp) {
+                        disp.textContent = job.isCompleted ? "完了！✨" : job.progress + "%";
+                        disp.style.color = job.isCompleted ? "#d4af37" : "#4caf50";
+                    }
 
                     renderCalendar();
                 }
             }
-
 
             function completeJob(id) {
                 const job = appData.longTermJobs.find(j => j.id === id);
@@ -2192,11 +2191,12 @@ oninput="
 
                 job.isCompleted = !job.isCompleted;
 
-                // 完了した日の日付を記録する
                 if (job.isCompleted) {
+                    job.progress = 100; // ここで100にする！
                     job.completedDate = selectedDate;
                 } else {
-                    delete job.completedDate;
+                    job.progress = 0;   // 戻すときは0にする
+                    job.completedDate = null;
                 }
 
                 saveData();
@@ -2204,6 +2204,8 @@ oninput="
                 updateFreeTime();
                 renderCalendar();
                 renderTimeline();
+                // 案件一覧も開いていれば更新
+                if (typeof openJobList === 'function') openJobList();
             }
 
 
@@ -2757,6 +2759,10 @@ oninput="
                 }, { passive: true });
 
                 dayScreen.addEventListener('touchend', (e) => {
+                    // もし触ったのが「スライダー」だったら、スワイプ処理を即終了する
+                    if (e.target.type === 'range') {
+                        return;
+                    }
                     // ★ここを追加：タスク操作中なら日付を切り替えない！
                     if (isDraggingTask) return;
                     const touchEndX = e.changedTouches[0].pageX;
@@ -2936,4 +2942,3 @@ oninput="
 </body>
 
 </html>
-
